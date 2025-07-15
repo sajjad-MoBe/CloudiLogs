@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -13,13 +14,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/lib/pq"
+	"github.com/segmentio/kafka-go"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	db    *sql.DB
-	store *sessions.CookieStore
+	db          *sql.DB
+	store       *sessions.CookieStore
+	kafkaWriter *kafka.Writer
 )
 
 type User struct {
@@ -74,6 +76,17 @@ func main() {
 	}
 	log.Println("Successfully connected to CockroachDB.")
 
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
+	if kafkaBroker == "" {
+		kafkaBroker = "kafka:9092"
+	}
+	kafkaWriter = &kafka.Writer{
+		Addr:     kafka.TCP(kafkaBroker),
+		Topic:    "log-events",
+		Balancer: &kafka.LeastBytes{},
+	}
+	log.Printf("Kafka writer configured for broker at %s", kafkaBroker)
+
 	r := mux.NewRouter()
 	r.HandleFunc("/health", healthCheckHandler).Methods("GET")
 
@@ -84,6 +97,7 @@ func main() {
 	apiRouter.HandleFunc("/auth/me", meHandler).Methods("GET")
 	apiRouter.HandleFunc("/projects", projectsHandler).Methods("GET", "POST")
 	apiRouter.HandleFunc("/projects/{projectId}/apikey", getProjectAPIKeyHandler).Methods("GET")
+	r.HandleFunc("/api/logs/{projectId}", logIngestionHandler).Methods("POST") // Note: Not under authenticated apiRouter
 
 	port := os.Getenv("BACKEND_API_PORT")
 	if port == "" {
@@ -266,12 +280,12 @@ func getProjectsHandler(w http.ResponseWriter, r *http.Request, userID string) {
 	projects := []Project{}
 	for rows.Next() {
 		var p Project
-		var searchableKeys pq.StringArray
-		if err := rows.Scan(&p.ID, &p.Name, &searchableKeys, &p.LogTTLSeconds, &p.OwnerID, &p.Description); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.SearchableKeys, &p.LogTTLSeconds, &p.OwnerID, &p.Description); err != nil {
+			// Log the detailed error for debugging
+			log.Printf("Scan error: %v", err)
 			respondWithError(w, http.StatusInternalServerError, "Failed to scan project")
 			return
 		}
-		p.SearchableKeys = []string(searchableKeys)
 		projects = append(projects, p)
 	}
 
@@ -365,4 +379,58 @@ func getProjectAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, map[string]string{"api_key": apiKey})
+}
+
+func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	projectID := vars["projectId"]
+	apiKey := r.Header.Get("X-API-KEY")
+
+	if projectID == "" || apiKey == "" {
+		respondWithError(w, http.StatusBadRequest, "Project ID and X-API-KEY header are required")
+		return
+	}
+
+	// Validate API Key
+	var dbProjectID string
+	err := db.QueryRow("SELECT id FROM projects WHERE id = $1 AND api_key = $2", projectID, apiKey).Scan(&dbProjectID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusUnauthorized, "Invalid Project ID or API Key")
+		} else {
+			log.Printf("API Key validation DB error: %v", err)
+			respondWithError(w, http.StatusInternalServerError, "Error validating API key")
+		}
+		return
+	}
+
+	// Read the log payload
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Could not read request body")
+		return
+	}
+	defer r.Body.Close()
+
+	if len(body) == 0 {
+		respondWithError(w, http.StatusBadRequest, "Request body is empty")
+		return
+	}
+
+	// Construct the message for Kafka
+	// We use the project ID as the key to ensure logs for the same project go to the same partition
+	msg := kafka.Message{
+		Key:   []byte(projectID),
+		Value: body,
+	}
+
+	// Write the message to Kafka
+	err = kafkaWriter.WriteMessages(r.Context(), msg)
+	if err != nil {
+		log.Printf("Failed to write message to Kafka: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to process log")
+		return
+	}
+
+	respondWithJSON(w, http.StatusAccepted, map[string]string{"status": "log accepted"})
 }

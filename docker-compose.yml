@@ -1,0 +1,98 @@
+version: '3.8'
+
+networks:
+  lognet:
+    driver: bridge
+
+volumes:
+  roach1_data:
+  roach2_data:
+  roach3_data:
+
+services:
+  roach1:
+    image: cockroachdb/cockroach:v23.1.10
+    container_name: roach1
+    networks:
+      - lognet
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    volumes:
+      - roach1_data:/cockroach/cockroach-data
+    command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach1
+    healthcheck:
+      test: ["CMD", "/cockroach/cockroach", "node", "status", "--insecure", "--host=roach1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  roach2:
+    image: cockroachdb/cockroach:v23.1.10
+    container_name: roach2
+    networks:
+      - lognet
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    volumes:
+      - roach2_data:/cockroach/cockroach-data
+    command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach2
+    depends_on:
+      - roach1
+
+  roach3:
+    image: cockroachdb/cockroach:v23.1.10
+    container_name: roach3
+    networks:
+      - lognet
+    ports:
+      - "26259:26257"
+      - "8082:8080"
+    volumes:
+      - roach3_data:/cockroach/cockroach-data
+    command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach3
+    depends_on:
+      - roach1
+
+  cockroach-init:
+    build:
+      context: ./cockroach-init
+      dockerfile: Dockerfile
+    container_name: cockroach-init
+    networks:
+      - lognet
+    depends_on:
+      - roach1
+      - roach2
+      - roach3
+
+  db-init:
+    build:
+      context: ./db-init
+      dockerfile: Dockerfile
+    networks:
+      - lognet
+    depends_on:
+      cockroach-init:
+        condition: service_completed_successfully
+    environment:
+      - COCKROACHDB_URL=postgresql://root@roach1:26257/logsdb?sslmode=disable
+    restart: on-failure
+
+  backend-api:
+    build:
+      context: ./backend-api
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8081"
+    networks:
+      - lognet
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      - COCKROACHDB_URL=postgresql://root@roach1:26257/logsdb?sslmode=disable
+      - SESSION_KEY=a-very-secret-key-for-dev-only
+      - BACKEND_API_PORT=8081
+    restart: on-failure

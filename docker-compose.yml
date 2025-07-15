@@ -8,6 +8,10 @@ volumes:
   roach1_data:
   roach2_data:
   roach3_data:
+  cassandra1_data:
+  cassandra2_data:
+  cassandra3_data:
+  clickhouse_data:
 
 services:
   roach1:
@@ -95,4 +99,117 @@ services:
       - COCKROACHDB_URL=postgresql://root@roach1:26257/logsdb?sslmode=disable
       - SESSION_KEY=a-very-secret-key-for-dev-only
       - BACKEND_API_PORT=8081
+      - KAFKA_BROKER=kafka:9092
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8084:80"
+    networks:
+      - lognet
+    depends_on:
+      - backend-api
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.2
+    container_name: zookeeper
+    networks:
+      - lognet
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka
+    networks:
+      - lognet
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  cassandra1:
+    image: cassandra:4.1
+    container_name: cassandra1
+    networks:
+      - lognet
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_CLUSTER_NAME=log-system-cluster
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+    volumes:
+      - cassandra1_data:/var/lib/cassandra
+
+  cassandra2:
+    image: cassandra:4.1
+    container_name: cassandra2
+    networks:
+      - lognet
+    depends_on:
+      - cassandra1
+    environment:
+      - CASSANDRA_CLUSTER_NAME=log-system-cluster
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+    volumes:
+      - cassandra2_data:/var/lib/cassandra
+
+  cassandra3:
+    image: cassandra:4.1
+    container_name: cassandra3
+    networks:
+      - lognet
+    depends_on:
+      - cassandra1
+    environment:
+      - CASSANDRA_CLUSTER_NAME=log-system-cluster
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+    volumes:
+      - cassandra3_data:/var/lib/cassandra
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: clickhouse
+    networks:
+      - lognet
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
+  log-processor:
+    build:
+      context: ./log-processor
+      dockerfile: Dockerfile
+    networks:
+      - lognet
+    depends_on:
+      - kafka
+      - cassandra1
+      - cassandra2
+      - cassandra3
+      - clickhouse
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - CASSANDRA_HOSTS=cassandra1,cassandra2,cassandra3
+      - CLICKHOUSE_HOST=clickhouse
     restart: on-failure

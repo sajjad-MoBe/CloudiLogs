@@ -19,6 +19,8 @@ const (
 	cassandraTable    = "logs"
 	clickhouseTable   = "logs"
 	kafkaTopic        = "log-events"
+	maxRetries        = 10
+	retryInterval     = 5 * time.Second
 )
 
 // LogPayload defines the structure of the log data received from Kafka.
@@ -33,51 +35,16 @@ func main() {
 	log.Println("Starting Log Processor Service...")
 
 	// --- Cassandra Setup ---
-	cassandraHosts := strings.Split(os.Getenv("CASSANDRA_HOSTS"), ",")
-	if len(cassandraHosts) == 0 || cassandraHosts[0] == "" {
-		log.Fatal("CASSANDRA_HOSTS environment variable is not set")
-	}
-	log.Printf("Connecting to Cassandra cluster at %v", cassandraHosts)
-	cluster := gocql.NewCluster(cassandraHosts...)
-	// Allow creating keyspace on the fly
-	cluster.Keyspace = "system"
-	session, err := cluster.CreateSession()
-	if err != nil {
-		log.Fatalf("Could not connect to Cassandra: %v", err)
-	}
+	session := connectToCassandra()
 	defer session.Close()
-	log.Println("Cassandra session created.")
 	initCassandra(session)
-	// Reconnect with the correct keyspace
-	cluster.Keyspace = cassandraKeyspace
-	session, err = cluster.CreateSession()
-	if err != nil {
-		log.Fatalf("Could not connect to Cassandra with keyspace %s: %v", cassandraKeyspace, err)
-	}
-	defer session.Close()
-	log.Println("Reconnected to Cassandra with keyspace:", cassandraKeyspace)
-
+	log.Println("Cassandra connection and schema verified.")
 
 	// --- ClickHouse Setup ---
-	clickhouseHost := os.Getenv("CLICKHOUSE_HOST")
-	if clickhouseHost == "" {
-		log.Fatal("CLICKHOUSE_HOST environment variable is not set")
-	}
-	clickhouseAddr := fmt.Sprintf("%s:9000", clickhouseHost)
-	log.Printf("Connecting to ClickHouse at %s", clickhouseAddr)
-	chConn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{clickhouseAddr},
-		Auth: clickhouse.Auth{
-			Database: "default",
-		},
-		DialTimeout: time.Second * 30,
-	})
-	if err != nil {
-		log.Fatalf("Could not connect to ClickHouse: %v", err)
-	}
+	chConn := connectToClickHouse()
+	defer chConn.Close()
 	initClickHouse(chConn)
 	log.Println("ClickHouse connection and schema verified.")
-
 
 	// --- Kafka Setup ---
 	kafkaBroker := os.Getenv("KAFKA_BROKER")
@@ -94,7 +61,6 @@ func main() {
 	})
 	defer kafkaReader.Close()
 	log.Println("Kafka reader created.")
-
 
 	// --- Main Processing Loop ---
 	log.Println("Starting log processing loop...")
@@ -136,6 +102,68 @@ func main() {
 
 		log.Printf("Processed log for project %s with ID %s", projectID, logID)
 	}
+}
+
+func connectToCassandra() *gocql.Session {
+	cassandraHosts := strings.Split(os.Getenv("CASSANDRA_HOSTS"), ",")
+	if len(cassandraHosts) == 0 || cassandraHosts[0] == "" {
+		log.Fatal("CASSANDRA_HOSTS environment variable is not set")
+	}
+
+	var session *gocql.Session
+	var err error
+
+	for i := 0; i < maxRetries; i++ {
+		log.Printf("Connecting to Cassandra cluster at %v (attempt %d/%d)", cassandraHosts, i+1, maxRetries)
+		cluster := gocql.NewCluster(cassandraHosts...)
+		cluster.Keyspace = "system" // Connect to system keyspace first to create our keyspace
+		session, err = cluster.CreateSession()
+		if err == nil {
+			// Now, reconnect with the correct keyspace
+			cluster.Keyspace = cassandraKeyspace
+			session, err = cluster.CreateSession()
+			if err == nil {
+				log.Println("Successfully connected to Cassandra.")
+				return session
+			}
+		}
+		log.Printf("Cassandra connection failed: %v. Retrying in %v...", err, retryInterval)
+		time.Sleep(retryInterval)
+	}
+	log.Fatalf("Could not connect to Cassandra after %d attempts: %v", maxRetries, err)
+	return nil
+}
+
+func connectToClickHouse() clickhouse.Conn {
+	clickhouseHost := os.Getenv("CLICKHOUSE_HOST")
+	if clickhouseHost == "" {
+		log.Fatal("CLICKHOUSE_HOST environment variable is not set")
+	}
+	clickhouseAddr := fmt.Sprintf("%s:9000", clickhouseHost)
+
+	var conn clickhouse.Conn
+	var err error
+
+	for i := 0; i < maxRetries; i++ {
+		log.Printf("Connecting to ClickHouse at %s (attempt %d/%d)", clickhouseAddr, i+1, maxRetries)
+		conn, err = clickhouse.Open(&clickhouse.Options{
+			Addr:        []string{clickhouseAddr},
+			Auth:        clickhouse.Auth{Database: "default"},
+			DialTimeout: time.Second * 5,
+		})
+		if err == nil {
+			if err := conn.Ping(context.Background()); err == nil {
+				log.Println("Successfully connected to ClickHouse.")
+				return conn
+			} else {
+				err = fmt.Errorf("ping failed: %w", err)
+			}
+		}
+		log.Printf("ClickHouse connection failed: %v. Retrying in %v...", err, retryInterval)
+		time.Sleep(retryInterval)
+	}
+	log.Fatalf("Could not connect to ClickHouse after %d attempts: %v", maxRetries, err)
+	return nil
 }
 
 func initCassandra(session *gocql.Session) {

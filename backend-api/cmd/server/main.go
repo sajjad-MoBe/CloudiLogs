@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -265,10 +266,12 @@ func getProjectsHandler(w http.ResponseWriter, r *http.Request, userID string) {
 	projects := []Project{}
 	for rows.Next() {
 		var p Project
-		if err := rows.Scan(&p.ID, &p.Name, &p.SearchableKeys, &p.LogTTLSeconds, &p.OwnerID, &p.Description); err != nil {
+		var searchableKeys pq.StringArray
+		if err := rows.Scan(&p.ID, &p.Name, &searchableKeys, &p.LogTTLSeconds, &p.OwnerID, &p.Description); err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Failed to scan project")
 			return
 		}
+		p.SearchableKeys = []string(searchableKeys)
 		projects = append(projects, p)
 	}
 

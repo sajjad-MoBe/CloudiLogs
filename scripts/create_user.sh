@@ -5,10 +5,10 @@
 
 set -e
 
-USERNAME=${1:-"testuser"}
-PASSWORD=${2:-"testpass"}
-EMAIL=${3:-"test@example.com"}
-FULLNAME=${4:-"Test User"}
+USERNAME=${1:-"sajjad"}
+PASSWORD=${2:-"sajjad"}
+EMAIL=${3:-"sajjad@beigi.com"}
+FULLNAME=${4:-"aghaye sajjad"}
 
 if ! docker-compose ps backend-api | grep -q "Up"; then
     echo "Error: The 'backend-api' service is not running. Please start the services with 'docker-compose up -d'."

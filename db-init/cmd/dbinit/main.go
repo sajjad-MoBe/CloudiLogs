@@ -10,7 +10,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-const schema = `
+const initialSchema = `
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username STRING(255) UNIQUE NOT NULL,
@@ -75,17 +75,35 @@ func main() {
 
 	log.Println("Successfully connected to CockroachDB.")
 
-	log.Println("Creating database if it doesn't exist...")
-	if _, err := db.ExecContext(context.Background(), "CREATE DATABASE IF NOT EXISTS logsdb"); err != nil {
-		log.Fatalf("Failed to create database: %v", err)
+	log.Println("Applying initial schema...")
+	if _, err := db.ExecContext(context.Background(), initialSchema); err != nil {
+		log.Fatalf("Failed to apply initial schema: %v", err)
 	}
-	log.Println("Database created successfully (or already existed).")
+	log.Println("Initial schema applied successfully (or already existed).")
 
-	log.Println("Applying database schema...")
-	if _, err := db.ExecContext(context.Background(), schema); err != nil {
-		log.Fatalf("Failed to apply schema: %v", err)
-	}
-	log.Println("Database schema applied successfully (or already existed).")
+	// Simple migration logic
+	log.Println("Running database migrations...")
+	runMigrations(db)
+	log.Println("Database migrations complete.")
 
 	log.Println("CockroachDB Initialization complete.")
+}
+
+func runMigrations(db *sql.DB) {
+	// Migration 1: Add 'role' column to 'user_project_access' table
+	var columnExists int
+	query := `SELECT 1 FROM [SHOW COLUMNS FROM user_project_access] WHERE column_name = 'role'`
+	err := db.QueryRow(query).Scan(&columnExists)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Println("Migration: 'role' column not found in 'user_project_access'. Adding it...")
+			alterQuery := `ALTER TABLE user_project_access ADD COLUMN role STRING(50) NOT NULL DEFAULT 'member'`
+			if _, alterErr := db.Exec(alterQuery); alterErr != nil {
+				log.Fatalf("Failed to execute migration to add 'role' column: %v", alterErr)
+			}
+			log.Println("Migration: 'role' column added successfully.")
+		} else {
+			log.Fatalf("Failed to check for 'role' column existence: %v", err)
+		}
+	}
 }

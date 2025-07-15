@@ -11,12 +11,28 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
 	db    *sql.DB
 	store *sessions.CookieStore
 )
+
+type User struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+}
+
+type Project struct {
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	APIKey         string   `json:"api_key,omitempty"`
+	SearchableKeys []string `json:"searchable_keys,omitempty"`
+	LogTTLSeconds  int      `json:"log_ttl_seconds"`
+	OwnerID        string   `json:"owner_id"`
+	Description    string   `json:"description,omitempty"`
+}
 
 func main() {
 	log.Println("Starting Backend API server...")
@@ -57,6 +73,7 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/health", healthCheckHandler).Methods("GET")
+	// Add user and project handlers here later
 
 	port := os.Getenv("BACKEND_API_PORT")
 	if port == "" {
@@ -91,4 +108,14 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	w.Write(response)
+}
+
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	return string(bytes), err
+}
+
+func checkPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Log Management System</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+</head>
+<body>
+    <header>
+        <h1>Log Management System</h1>
+    </header>
+    <main>
+        <h2>Login</h2>
+        <form id="login-form">
+            <p>
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </p>
+            <p>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </p>
+            <p>
+                <button type="submit">Login</button>
+            </p>
+        </form>
+        <p id="error-message" style="color: red;"></p>
+    </main>
+    <script type="module" src="/js/login.js"></script>
+</body>
+</html>

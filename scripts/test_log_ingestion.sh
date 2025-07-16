@@ -13,7 +13,6 @@ if [ -z "$PROJECT_ID" ] || [ -z "$API_KEY" ]; then
     echo ""
     echo "Please provide the Project ID and the API Key for the project."
     echo "You can get these values from the web interface at http://localhost:8084 after creating a project."
-    echo "Note: The Project ID is currently not displayed in the UI, you may need to inspect the network requests or query the database to find it."
     exit 1
 fi
 
@@ -35,8 +34,8 @@ JSON_PAYLOAD=$(cat <<EOF
   "name": "$EVENT_NAME",
   "timestamp": "$TIMESTAMP",
   "searchable_keys": {
-    "user_id": "$USER_ID",
-    "request_id": "$REQUEST_ID"
+    "folan1": "$USER_ID",
+    "folan2": "$REQUEST_ID"
   },
   "full_payload": {
     "ip_address": "127.0.0.1",
@@ -49,7 +48,7 @@ EOF
 )
 
 # Send the request using curl
-curl -i -X POST "http://localhost:8084/api/logs/${PROJECT_ID}" \
+curl -i -X POST "http://localhost:8083/api/projects/${PROJECT_ID}/logs" \
 -H "Content-Type: application/json" \
 -H "X-API-KEY: ${API_KEY}" \
 -d "$JSON_PAYLOAD"

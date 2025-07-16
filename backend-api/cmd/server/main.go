@@ -98,7 +98,8 @@ func main() {
 	apiRouter.HandleFunc("/auth/me", meHandler).Methods("GET")
 	apiRouter.HandleFunc("/projects", projectsHandler).Methods("GET", "POST")
 	apiRouter.HandleFunc("/projects/{projectId}/apikey", getProjectAPIKeyHandler).Methods("GET")
-	apiRouter.HandleFunc("/logs/{projectId}", logIngestionHandler).Methods("POST")
+	apiRouter.HandleFunc("/projects/{projectId}/logs", logsHandler).Methods("GET", "POST")
+	apiRouter.HandleFunc("/projects/{projectId}/logs/{logId}", getLogHandler).Methods("GET")
 
 	port := os.Getenv("BACKEND_API_PORT")
 	if port == "" {
@@ -382,6 +383,25 @@ func getProjectAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]string{"api_key": apiKey})
 }
 
+type Log struct {
+	ID        string    `json:"id"`
+	ProjectID string    `json:"project_id"`
+	EventName string    `json:"event_name"`
+	Timestamp time.Time `json:"timestamp"`
+	Payload   string    `json:"payload"`
+}
+
+func logsHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		queryLogsHandler(w, r)
+	case "POST":
+		logIngestionHandler(w, r)
+	default:
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
 func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "logsys-session")
 	userID, ok := session.Values["user_id"].(string)
@@ -453,4 +473,59 @@ func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusAccepted, map[string]string{"status": "log accepted"})
+}
+
+func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "logsys-session")
+	userID, ok := session.Values["user_id"].(string)
+	if !ok {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+	projectID := vars["projectId"]
+
+	// Check if user has access to the project
+	var accessCheck int
+	err := db.QueryRow("SELECT 1 FROM user_project_access WHERE user_id = $1 AND project_id = $2", userID, projectID).Scan(&accessCheck)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusForbidden, "You do not have access to this project")
+		} else {
+			respondWithError(w, http.StatusInternalServerError, "Database error on access check")
+		}
+		return
+	}
+
+	// TODO: Implement querying from ClickHouse
+	respondWithJSON(w, http.StatusOK, []Log{})
+}
+
+func getLogHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "logsys-session")
+	userID, ok := session.Values["user_id"].(string)
+	if !ok {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+	projectID := vars["projectId"]
+	logID := vars["logId"]
+
+	// Check if user has access to the project
+	var accessCheck int
+	err := db.QueryRow("SELECT 1 FROM user_project_access WHERE user_id = $1 AND project_id = $2", userID, projectID).Scan(&accessCheck)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusForbidden, "You do not have access to this project")
+		} else {
+			respondWithError(w, http.StatusInternalServerError, "Database error on access check")
+		}
+		return
+	}
+
+	// TODO: Implement querying from Cassandra
+	respondWithJSON(w, http.StatusOK, Log{ID: logID})
 }

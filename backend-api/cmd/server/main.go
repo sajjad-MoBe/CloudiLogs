@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
 	"github.com/segmentio/kafka-go"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -97,7 +98,7 @@ func main() {
 	apiRouter.HandleFunc("/auth/me", meHandler).Methods("GET")
 	apiRouter.HandleFunc("/projects", projectsHandler).Methods("GET", "POST")
 	apiRouter.HandleFunc("/projects/{projectId}/apikey", getProjectAPIKeyHandler).Methods("GET")
-	r.HandleFunc("/api/logs/{projectId}", logIngestionHandler).Methods("POST") // Note: Not under authenticated apiRouter
+	apiRouter.HandleFunc("/logs/{projectId}", logIngestionHandler).Methods("POST")
 
 	port := os.Getenv("BACKEND_API_PORT")
 	if port == "" {
@@ -280,7 +281,7 @@ func getProjectsHandler(w http.ResponseWriter, r *http.Request, userID string) {
 	projects := []Project{}
 	for rows.Next() {
 		var p Project
-		if err := rows.Scan(&p.ID, &p.Name, &p.SearchableKeys, &p.LogTTLSeconds, &p.OwnerID, &p.Description); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, pq.Array(&p.SearchableKeys), &p.LogTTLSeconds, &p.OwnerID, &p.Description); err != nil {
 			// Log the detailed error for debugging
 			log.Printf("Scan error: %v", err)
 			respondWithError(w, http.StatusInternalServerError, "Failed to scan project")
@@ -314,13 +315,13 @@ func createProjectHandler(w http.ResponseWriter, r *http.Request, userID string)
 	defer tx.Rollback()
 
 	err = tx.QueryRow("INSERT INTO projects (name, api_key, searchable_keys, log_ttl_seconds, owner_id, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-		req.Name, apiKey, req.SearchableKeys, req.LogTTLSeconds, userID, req.Description).Scan(&projectID)
+		req.Name, apiKey, pq.Array(req.SearchableKeys), req.LogTTLSeconds, userID, req.Description).Scan(&projectID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to create project")
 		return
 	}
 
-	_, err = tx.Exec("INSERT INTO user_project_access (user_id, project_id, role) VALUES ($1, $2, $3)", userID, projectID, "admin")
+	_, err = tx.Exec("INSERT INTO user_project_access (user_id, project_id, role) VALUES ($1, $2, 'admin')", userID, projectID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to grant project access")
 		return
@@ -382,6 +383,13 @@ func getProjectAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "logsys-session")
+	userID, ok := session.Values["user_id"].(string)
+	if !ok {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	vars := mux.Vars(r)
 	projectID := vars["projectId"]
 	apiKey := r.Header.Get("X-API-KEY")
@@ -391,12 +399,24 @@ func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate API Key
-	var dbProjectID string
-	err := db.QueryRow("SELECT id FROM projects WHERE id = $1 AND api_key = $2", projectID, apiKey).Scan(&dbProjectID)
+	// 1. Check if the user has access to this project
+	var accessCheck int
+	err := db.QueryRow("SELECT 1 FROM user_project_access WHERE user_id = $1 AND project_id = $2", userID, projectID).Scan(&accessCheck)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respondWithError(w, http.StatusUnauthorized, "Invalid Project ID or API Key")
+			respondWithError(w, http.StatusForbidden, "You do not have access to this project")
+		} else {
+			respondWithError(w, http.StatusInternalServerError, "Database error on access check")
+		}
+		return
+	}
+
+	// 2. Validate API Key
+	var dbProjectID string
+	err = db.QueryRow("SELECT id FROM projects WHERE id = $1 AND api_key = $2", projectID, apiKey).Scan(&dbProjectID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusUnauthorized, "Invalid API Key for this project")
 		} else {
 			log.Printf("API Key validation DB error: %v", err)
 			respondWithError(w, http.StatusInternalServerError, "Error validating API key")

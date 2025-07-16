@@ -19,7 +19,7 @@ fi
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EVENT_NAME="test_event_from_script"
 USER_ID="user-$(shuf -i 1000-9999 -n 1)"
-REQUEST_ID=$(cat /proc/sys/kernel/random/uuid)
+REQUEST_ID=$(uuidgen)
 
 echo "Sending a sample log with the following details:"
 echo "Project ID: $PROJECT_ID"

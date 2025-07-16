@@ -100,6 +100,8 @@ services:
       - SESSION_KEY=a-very-secret-key-for-dev-only
       - BACKEND_API_PORT=8081
       - KAFKA_BROKER=kafka:9092
+      - CLICKHOUSE_HOST=clickhouse
+      - CASSANDRA_HOSTS=cassandra1
     restart: on-failure
 
   frontend:

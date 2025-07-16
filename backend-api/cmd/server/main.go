@@ -5,12 +5,16 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/gocql/gocql"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -23,6 +27,8 @@ var (
 	db          *sql.DB
 	store       *sessions.CookieStore
 	kafkaWriter *kafka.Writer
+	chConn      clickhouse.Conn
+	cassandra   *gocql.Session
 )
 
 type User struct {
@@ -87,6 +93,36 @@ func main() {
 		Balancer: &kafka.LeastBytes{},
 	}
 	log.Printf("Kafka writer configured for broker at %s", kafkaBroker)
+
+	clickhouseHost := os.Getenv("CLICKHOUSE_HOST")
+	if clickhouseHost == "" {
+		clickhouseHost = "clickhouse"
+	}
+	chConn, err = clickhouse.Open(&clickhouse.Options{
+		Addr: []string{clickhouseHost + ":9000"},
+		Auth: clickhouse.Auth{
+			Database: "default",
+		},
+		DialTimeout:  time.Second,
+		MaxOpenConns: 10,
+		MaxIdleConns: 5,
+	})
+	if err != nil {
+		log.Fatalf("Failed to connect to ClickHouse: %v", err)
+	}
+	log.Println("Successfully connected to ClickHouse.")
+
+	cassandraHost := os.Getenv("CASSANDRA_HOSTS")
+	if cassandraHost == "" {
+		cassandraHost = "cassandra1"
+	}
+	cluster := gocql.NewCluster(cassandraHost)
+	cluster.Keyspace = "logsystem"
+	cassandra, err = cluster.CreateSession()
+	if err != nil {
+		log.Fatalf("Failed to connect to Cassandra: %v", err)
+	}
+	log.Println("Successfully connected to Cassandra.")
 
 	r := mux.NewRouter()
 	r.HandleFunc("/health", healthCheckHandler).Methods("GET")
@@ -498,8 +534,63 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement querying from ClickHouse
-	respondWithJSON(w, http.StatusOK, []Log{})
+	query := r.URL.Query().Get("query")
+	start := r.URL.Query().Get("start")
+	end := r.URL.Query().Get("end")
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	var args []interface{}
+	sql := "SELECT log_id, event_name, event_timestamp, searchable_keys FROM logs WHERE project_id = ?"
+	args = append(args, projectID)
+
+	if query != "" {
+		sql += " AND " + query
+	}
+	if start != "" {
+		sql += " AND event_timestamp >= ?"
+		args = append(args, start)
+	}
+	if end != "" {
+		sql += " AND event_timestamp <= ?"
+		args = append(args, end)
+	}
+
+	limit := 100
+	if limitStr != "" {
+		limit, _ = strconv.Atoi(limitStr)
+	}
+	sql += " LIMIT ?"
+	args = append(args, limit)
+
+	if offsetStr != "" {
+		offset, _ := strconv.Atoi(offsetStr)
+		sql += " OFFSET ?"
+		args = append(args, offset)
+	}
+
+	rows, err := chConn.Query(r.Context(), sql, args...)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to query logs from ClickHouse")
+		return
+	}
+	defer rows.Close()
+
+	var logs []Log
+	for rows.Next() {
+		var log Log
+		var searchableKeys map[string]string
+		if err := rows.Scan(&log.ID, &log.EventName, &log.Timestamp, &searchableKeys); err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to scan log")
+			return
+		}
+		log.ProjectID = projectID
+		// a simple way to represent payload
+		log.Payload = fmt.Sprintf("%v", searchableKeys)
+		logs = append(logs, log)
+	}
+
+	respondWithJSON(w, http.StatusOK, logs)
 }
 
 func getLogHandler(w http.ResponseWriter, r *http.Request) {
@@ -526,6 +617,16 @@ func getLogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement querying from Cassandra
-	respondWithJSON(w, http.StatusOK, Log{ID: logID})
+	var log Log
+	if err := cassandra.Query("SELECT project_id, event_name, event_timestamp, payload FROM logs WHERE log_id = ?", logID).Scan(&log.ProjectID, &log.EventName, &log.Timestamp, &log.Payload); err != nil {
+		if err == gocql.ErrNotFound {
+			respondWithError(w, http.StatusNotFound, "Log not found")
+		} else {
+			respondWithError(w, http.StatusInternalServerError, "Failed to query log from Cassandra")
+		}
+		return
+	}
+	log.ID = logID
+
+	respondWithJSON(w, http.StatusOK, log)
 }

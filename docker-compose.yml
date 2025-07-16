@@ -139,9 +139,10 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
 
   cassandra1:
-    image: cassandra:4.1
+    image: cassandra:latest
     container_name: cassandra1
     networks:
       - lognet
@@ -149,41 +150,41 @@ services:
       - "9042:9042"
     environment:
       - CASSANDRA_CLUSTER_NAME=log-system-cluster
-      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_SEEDS=cassandra1
       - CASSANDRA_DC=dc1
       - CASSANDRA_RACK=rack1
     volumes:
       - cassandra1_data:/var/lib/cassandra
 
-  cassandra2:
-    image: cassandra:4.1
-    container_name: cassandra2
-    networks:
-      - lognet
-    depends_on:
-      - cassandra1
-    environment:
-      - CASSANDRA_CLUSTER_NAME=log-system-cluster
-      - CASSANDRA_SEEDS=cassandra1,cassandra2
-      - CASSANDRA_DC=dc1
-      - CASSANDRA_RACK=rack1
-    volumes:
-      - cassandra2_data:/var/lib/cassandra
-
-  cassandra3:
-    image: cassandra:4.1
-    container_name: cassandra3
-    networks:
-      - lognet
-    depends_on:
-      - cassandra1
-    environment:
-      - CASSANDRA_CLUSTER_NAME=log-system-cluster
-      - CASSANDRA_SEEDS=cassandra1,cassandra2
-      - CASSANDRA_DC=dc1
-      - CASSANDRA_RACK=rack1
-    volumes:
-      - cassandra3_data:/var/lib/cassandra
+  # cassandra2:
+  #   image: cassandra:latest
+  #   container_name: cassandra2
+  #   networks:
+  #     - lognet
+  #   depends_on:
+  #     - cassandra1
+  #   environment:
+  #     - CASSANDRA_CLUSTER_NAME=log-system-cluster
+  #     - CASSANDRA_SEEDS=cassandra1,cassandra2
+  #     - CASSANDRA_DC=dc1
+  #     - CASSANDRA_RACK=rack1
+  #   volumes:
+  #     - cassandra2_data:/var/lib/cassandra
+  #
+  # cassandra3:
+  #   image: cassandra:latest
+  #   container_name: cassandra3
+  #   networks:
+  #     - lognet
+  #   depends_on:
+  #     - cassandra1
+  #   environment:
+  #     - CASSANDRA_CLUSTER_NAME=log-system-cluster
+  #     - CASSANDRA_SEEDS=cassandra1,cassandra2
+  #     - CASSANDRA_DC=dc1
+  #     - CASSANDRA_RACK=rack1
+  #   volumes:
+  #     - cassandra3_data:/var/lib/cassandra
 
   clickhouse:
     image: clickhouse/clickhouse-server:23.8
@@ -205,11 +206,11 @@ services:
     depends_on:
       - kafka
       - cassandra1
-      - cassandra2
-      - cassandra3
+      # - cassandra2
+      # - cassandra3
       - clickhouse
     environment:
       - KAFKA_BROKER=kafka:9092
-      - CASSANDRA_HOSTS=cassandra1,cassandra2,cassandra3
+      - CASSANDRA_HOSTS=cassandra1
       - CLICKHOUSE_HOST=clickhouse
     restart: on-failure

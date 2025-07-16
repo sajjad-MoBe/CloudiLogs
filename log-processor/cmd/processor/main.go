@@ -36,8 +36,17 @@ func main() {
 
 	// --- Cassandra Setup ---
 	session := connectToCassandra()
-	defer session.Close()
 	initCassandra(session)
+	session.Close()
+
+	cluster := gocql.NewCluster(strings.Split(os.Getenv("CASSANDRA_HOSTS"), ",")...)
+	cluster.Keyspace = cassandraKeyspace
+	session, err := cluster.CreateSession()
+	if err != nil {
+		log.Fatalf("Failed to connect to Cassandra with keyspace: %v", err)
+	}
+	defer session.Close()
+
 	log.Println("Cassandra connection and schema verified.")
 
 	// --- ClickHouse Setup ---
@@ -116,16 +125,11 @@ func connectToCassandra() *gocql.Session {
 	for i := 0; i < maxRetries; i++ {
 		log.Printf("Connecting to Cassandra cluster at %v (attempt %d/%d)", cassandraHosts, i+1, maxRetries)
 		cluster := gocql.NewCluster(cassandraHosts...)
-		cluster.Keyspace = "system" // Connect to system keyspace first to create our keyspace
+		cluster.Keyspace = "system"
 		session, err = cluster.CreateSession()
 		if err == nil {
-			// Now, reconnect with the correct keyspace
-			cluster.Keyspace = cassandraKeyspace
-			session, err = cluster.CreateSession()
-			if err == nil {
-				log.Println("Successfully connected to Cassandra.")
-				return session
-			}
+			log.Println("Successfully connected to Cassandra.")
+			return session
 		}
 		log.Printf("Cassandra connection failed: %v. Retrying in %v...", err, retryInterval)
 		time.Sleep(retryInterval)

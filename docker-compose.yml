@@ -12,6 +12,9 @@ volumes:
   cassandra2_data:
   cassandra3_data:
   clickhouse_data:
+  gomodcache-backend:
+  gomodcache-log-processor:
+  gomodcache-db-init:
 
 services:
   roach1:
@@ -77,6 +80,8 @@ services:
       dockerfile: Dockerfile
     networks:
       - lognet
+    volumes:
+      - gomodcache-db-init:/go/pkg/mod
     depends_on:
       cockroach-init:
         condition: service_completed_successfully
@@ -92,6 +97,8 @@ services:
       - "8083:8081"
     networks:
       - lognet
+    volumes:
+      - gomodcache-backend:/go/pkg/mod
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -205,6 +212,8 @@ services:
       dockerfile: Dockerfile
     networks:
       - lognet
+    volumes:
+      - gomodcache-log-processor:/go/pkg/mod
     depends_on:
       - kafka
       - cassandra1

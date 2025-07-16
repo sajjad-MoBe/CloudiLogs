@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs - Log Management System</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+    <style>
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .log-table th, .log-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .log-table tr:nth-child(even){background-color: #f2f2f2;}
+        .log-table tr:hover {background-color: #ddd;}
+        .log-table th {
+            padding-top: 12px;
+            padding-bottom: 12px;
+            text-align: left;
+            background-color: #4CAF50;
+            color: white;
+        }
+        .log-details {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .log-details pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Logs for <span id="project-name"></span></h1>
+        <p><a href="/projects.html">&larr; Back to Projects</a></p>
+    </header>
+    <main>
+        <h2>Search Logs</h2>
+        <form id="search-form">
+            <p>
+                <label for="event-name">Event Name</label>
+                <input type="text" id="event-name" name="event_name">
+            </p>
+            <p>
+                <label for="start-time">Start Time</label>
+                <input type="datetime-local" id="start-time" name="start_time">
+            </p>
+            <p>
+                <label for="end-time">End Time</label>
+                <input type="datetime-local" id="end-time" name="end_time">
+            </p>
+            <p>
+                <label for="search-keys">Searchable Keys (key:value, ...)</label>
+                <input type="text" id="search-keys" name="search_keys">
+            </p>
+            <p>
+                <button type="submit">Search</button>
+            </p>
+        </form>
+
+        <h2>Log Events</h2>
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Event Name</th>
+                    <th>Timestamp</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="logs-tbody">
+                <!-- Log rows will be inserted here -->
+            </tbody>
+        </table>
+        <p id="no-logs" style="display: none;">No logs found for this project.</p>
+
+        <div id="log-details-container" class="log-details" style="display: none;">
+            <h3>Log Details</h3>
+            <pre id="log-details-content"></pre>
+            <div>
+                <button id="prev-log-btn">&larr; Previous</button>
+                <button id="next-log-btn">Next &rarr;</button>
+            </div>
+        </div>
+    </main>
+    <script type="module" src="/js/logs.js"></script>
+</body>
+</html>

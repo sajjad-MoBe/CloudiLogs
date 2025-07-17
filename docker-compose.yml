@@ -150,6 +150,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
 
+  
   cassandra1:
     image: cassandra:latest
     container_name: cassandra1
@@ -159,43 +160,61 @@ services:
       - "9042:9042"
     environment:
       - CASSANDRA_CLUSTER_NAME=log-system-cluster
-      - CASSANDRA_SEEDS=cassandra1
       - CASSANDRA_DC=dc1
       - CASSANDRA_RACK=rack1
-      - CASSANDRA_AUTHENTICATOR=AllowAllAuthenticator
-      - CASSANDRA_AUTHORIZER=AllowAllAuthorizer
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra1
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra1
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - MAX_HEAP_SIZE=2G
+      - HEAP_NEWSIZE=400M
     volumes:
       - cassandra1_data:/var/lib/cassandra
+    restart: always
 
-  # cassandra2:
-  #   image: cassandra:latest
-  #   container_name: cassandra2
-  #   networks:
-  #     - lognet
-  #   depends_on:
-  #     - cassandra1
-  #   environment:
-  #     - CASSANDRA_CLUSTER_NAME=log-system-cluster
-  #     - CASSANDRA_SEEDS=cassandra1,cassandra2
-  #     - CASSANDRA_DC=dc1
-  #     - CASSANDRA_RACK=rack1
-  #   volumes:
-  #     - cassandra2_data:/var/lib/cassandra
-  #
-  # cassandra3:
-  #   image: cassandra:latest
-  #   container_name: cassandra3
-  #   networks:
-  #     - lognet
-  #   depends_on:
-  #     - cassandra1
-  #   environment:
-  #     - CASSANDRA_CLUSTER_NAME=log-system-cluster
-  #     - CASSANDRA_SEEDS=cassandra1,cassandra2
-  #     - CASSANDRA_DC=dc1
-  #     - CASSANDRA_RACK=rack1
-  #   volumes:
-  #     - cassandra3_data:/var/lib/cassandra
+  cassandra2:
+    image: cassandra:latest
+    container_name: cassandra2
+    networks:
+      - lognet
+    depends_on:
+      - cassandra1
+    environment:
+      - CASSANDRA_CLUSTER_NAME=log-system-cluster
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra2
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra2
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - MAX_HEAP_SIZE=2G
+      - HEAP_NEWSIZE=400M
+    volumes:
+      - cassandra2_data:/var/lib/cassandra
+    restart: always
+
+
+  cassandra3:
+    image: cassandra:latest
+    container_name: cassandra3
+    networks:
+      - lognet
+    depends_on:
+      - cassandra1
+    environment:
+      - CASSANDRA_CLUSTER_NAME=log-system-cluster
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra3
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra3
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - MAX_HEAP_SIZE=2G
+      - HEAP_NEWSIZE=400M
+    volumes:
+      - cassandra3_data:/var/lib/cassandra
+    restart: always
+
 
   clickhouse:
     image: clickhouse/clickhouse-server:23.8

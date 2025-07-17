@@ -295,7 +295,7 @@ func projectsHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
-		getProjectsHandler(w, r, userID)
+		getProjectsHandler(w, userID)
 	case "POST":
 		createProjectHandler(w, r, userID)
 	default:
@@ -303,7 +303,7 @@ func projectsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getProjectsHandler(w http.ResponseWriter, r *http.Request, userID string) {
+func getProjectsHandler(w http.ResponseWriter, userID string) {
 	rows, err := db.Query(`
 		SELECT p.id, p.name, p.searchable_keys, p.log_ttl_seconds, p.owner_id, p.description
 		FROM projects p

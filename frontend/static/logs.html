@@ -1,90 +1,208 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logs - Log Management System</title>
     <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
     <style>
+        /* Shared "cool dark theme" with yellow accents */
+        :root {
+            --bg: #1a1a1a;
+            --accent-bg: #242424;
+            --text: #e2e2e2;
+            --accent: #ffc107; /* simple.css default yellow */
+            --border: #333;
+            --form-bg: #2d2d2d;
+            --hover-bg: #2c2c2c; /* Background for table row hover */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* --- UPDATED: Full-Width Header Styling --- */
+        header {
+            background-color: var(--accent-bg); /* Give the header a background */
+            border-bottom: 1px solid var(--border); /* Clean separator line */
+            padding: 1.5rem 1rem; /* Add horizontal padding for small screens */
+            margin-bottom: 2.5rem; /* Space between header and form */
+            text-align: center;
+        }
+        /* New container to keep content centered with the page */
+        .header-container {
+             max-width: 1200px;
+             margin: 0 auto;
+        }
+        header p {
+            margin-top: 0.5rem;
+        }
+        main {
+            max-width: 1200px;
+        }
+        header a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        header a:hover {
+            text-decoration: underline;
+        }
+
+        /* --- Search Form Styling --- */
+        form {
+            background-color: var(--accent-bg);
+            padding: 2rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+        form h2 {
+            text-align: center;
+        }
+        form p {
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 1rem;
+        }
+        form p:last-child {
+            text-align: center;
+        }
+
+        /* Input Styling */
+        input[type="text"],
+        input[type="datetime-local"] {
+            background-color: var(--form-bg);
+            border-color: var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            width: 100%;
+        }
+        input[type="text"]:focus,
+        input[type="datetime-local"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.25);
+        }
+
+        /* Button Styling */
+        button[type="submit"] {
+            background-color: var(--accent);
+            border: none;
+            font-weight: 600;
+            color: #1a1a1a;
+            padding-left: 2rem;
+            padding-right: 2rem;
+        }
+        button[type="submit"]:hover {
+            background-color: #e0a800;
+        }
+
+        /* --- Dark Theme Table Styling --- */
         .log-table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 1rem;
+            background-color: var(--accent-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
         }
         .log-table th, .log-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-        }
-        .log-table tr:nth-child(even){background-color: #f2f2f2;}
-        .log-table tr:hover {background-color: #ddd;}
-        .log-table th {
-            padding-top: 12px;
-            padding-bottom: 12px;
+            border: none;
+            border-bottom: 1px solid var(--border);
+            padding: 1rem;
             text-align: left;
-            background-color: #4CAF50;
-            color: white;
         }
-        .log-details {
-            background-color: #f9f9f9;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 20px;
+        .log-table tbody tr:last-child td {
+             border-bottom: none;
         }
-        .log-details pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        .log-table th {
+            background-color: #333;
+            color: var(--text);
+            font-weight: 600;
         }
+        .log-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        .log-table tbody tr:hover {
+            background-color: var(--hover-bg);
+        }
+        .log-table button {
+            font-size: 0.9rem;
+        }
+
+        /* --- Dark Theme Modal Styling --- */
         .modal {
             display: none;
             position: fixed;
-            z-index: 1;
+            z-index: 100;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
             overflow: auto;
-            background-color: rgb(0,0,0);
-            background-color: rgba(0,0,0,0.4);
+            background-color: rgba(0,0,0,0.7);
         }
         .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
+            background-color: var(--accent-bg);
+            color: var(--text);
+            margin: 10% auto;
+            padding: 25px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
             width: 80%;
+            max-width: 900px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
         }
         .close-btn {
-            color: #aaa;
+            color: #ccc;
             float: right;
             font-size: 28px;
             font-weight: bold;
+            transition: color 0.2s ease;
         }
         .close-btn:hover,
         .close-btn:focus {
-            color: black;
+            color: white;
             text-decoration: none;
             cursor: pointer;
+        }
+        .modal-content pre {
+            background-color: var(--bg);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: var(--text);
+        }
+        .modal-content div {
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>Logs for <span id="project-name"></span></h1>
-        <p><a href="/projects.html">&larr; Back to Projects</a></p>
+        <div class="header-container">
+            <h1>Logs for <span id="project-name">Your Project</span></h1>
+            <p><a href="#">&larr; Back to Projects</a></p>
+        </div>
     </header>
     <main>
-        <h2>Search Logs</h2>
         <form id="search-form">
+            <h2>Search Logs</h2>
             <p>
                 <label for="event-name">Event Name</label>
                 <input type="text" id="event-name" name="event_name">
             </p>
             <p>
                 <label for="start-time">Start Time</label>
-                <input type="datetime-local" id="start-time" name="start_time">
+                <input type="datetime-local" id="start-time" name="start_time" value="2025-07-17T21:09">
             </p>
             <p>
                 <label for="end-time">End Time</label>
-                <input type="datetime-local" id="end-time" name="end_time">
+                <input type="datetime-local" id="end-time" name="end_time" value="2025-07-17T21:09">
             </p>
             <p>
                 <label for="search-keys">Searchable Keys (key:value, ...)</label>
@@ -106,7 +224,24 @@
                 </tr>
             </thead>
             <tbody id="logs-tbody">
-                <!-- Log rows will be inserted here -->
+                <tr>
+                    <td>User Login Success</td>
+                    <td>152</td>
+                    <td>2025-07-17 21:00:00</td>
+                    <td><button>View</button></td>
+                </tr>
+                <tr>
+                    <td>Payment Failed</td>
+                    <td>5</td>
+                    <td>2025-07-17 20:45:10</td>
+                    <td><button>View</button></td>
+                </tr>
+                 <tr>
+                    <td>API Request Timeout</td>
+                    <td>23</td>
+                    <td>2025-07-17 19:12:34</td>
+                    <td><button>View</button></td>
+                </tr>
             </tbody>
         </table>
         <p id="no-logs" style="display: none;">No logs found for this project.</p>
@@ -115,7 +250,11 @@
             <div class="modal-content">
                 <span class="close-btn">&times;</span>
                 <h3>Log Details</h3>
-                <pre id="log-details-content"></pre>
+                <pre id="log-details-content">{
+  "user_id": "usr_12345",
+  "ip_address": "192.168.1.1",
+  "message": "User login successful via password."
+}</pre>
                 <div>
                     <button id="prev-log-btn">&larr; Previous</button>
                     <button id="next-log-btn">Next &rarr;</button>

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -439,37 +440,13 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "logsys-session")
-	userID, ok := session.Values["user_id"].(string)
-	if !ok {
-		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
-
 	vars := mux.Vars(r)
 	projectID := vars["projectId"]
 	apiKey := r.Header.Get("X-API-KEY")
 
-	if projectID == "" || apiKey == "" {
-		respondWithError(w, http.StatusBadRequest, "Project ID and X-API-KEY header are required")
-		return
-	}
-
-	// 1. Check if the user has access to this project
-	var accessCheck int
-	err := db.QueryRow("SELECT 1 FROM user_project_access WHERE user_id = $1 AND project_id = $2", userID, projectID).Scan(&accessCheck)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondWithError(w, http.StatusForbidden, "You do not have access to this project")
-		} else {
-			respondWithError(w, http.StatusInternalServerError, "Database error on access check")
-		}
-		return
-	}
-
-	// 2. Validate API Key
+	// Validate API Key
 	var dbProjectID string
-	err = db.QueryRow("SELECT id FROM projects WHERE id = $1 AND api_key = $2", projectID, apiKey).Scan(&dbProjectID)
+	err := db.QueryRow("SELECT id FROM projects WHERE id = $1 AND api_key = $2", projectID, apiKey).Scan(&dbProjectID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusUnauthorized, "Invalid API Key for this project")
@@ -534,9 +511,10 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := r.URL.Query().Get("query")
-	start := r.URL.Query().Get("start")
-	end := r.URL.Query().Get("end")
+	eventName := r.URL.Query().Get("event_name")
+	startTime := r.URL.Query().Get("start_time")
+	endTime := r.URL.Query().Get("end_time")
+	searchKeysStr := r.URL.Query().Get("search_keys")
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
@@ -544,16 +522,29 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 	sql := "SELECT log_id, event_name, event_timestamp, searchable_keys FROM logs WHERE project_id = ?"
 	args = append(args, projectID)
 
-	if query != "" {
-		sql += " AND " + query
+	if eventName != "" {
+		sql += " AND event_name = ?"
+		args = append(args, eventName)
 	}
-	if start != "" {
+	if startTime != "" {
 		sql += " AND event_timestamp >= ?"
-		args = append(args, start)
+		args = append(args, startTime)
 	}
-	if end != "" {
+	if endTime != "" {
 		sql += " AND event_timestamp <= ?"
-		args = append(args, end)
+		args = append(args, endTime)
+	}
+
+	if searchKeysStr != "" {
+		searchKeys, err := parseSearchKeys(searchKeysStr)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid search_keys format")
+			return
+		}
+		for k, v := range searchKeys {
+			sql += " AND searchable_keys[?] = ?"
+			args = append(args, k, v)
+		}
 	}
 
 	limit := 100
@@ -591,6 +582,19 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, logs)
+}
+
+func parseSearchKeys(searchKeysStr string) (map[string]string, error) {
+	searchKeys := make(map[string]string)
+	pairs := strings.Split(searchKeysStr, ",")
+	for _, pair := range pairs {
+		kv := strings.Split(pair, ":")
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("invalid key-value pair: %s", pair)
+		}
+		searchKeys[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+	}
+	return searchKeys, nil
 }
 
 func getLogHandler(w http.ResponseWriter, r *http.Request) {

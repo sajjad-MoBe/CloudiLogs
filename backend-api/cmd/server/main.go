@@ -136,6 +136,7 @@ func main() {
 	apiRouter.HandleFunc("/projects", projectsHandler).Methods("GET", "POST")
 	apiRouter.HandleFunc("/projects/{projectId}/apikey", getProjectAPIKeyHandler).Methods("GET")
 	apiRouter.HandleFunc("/projects/{projectId}/logs", logsHandler).Methods("GET", "POST")
+	apiRouter.HandleFunc("/projects/{projectId}/logs/aggregated", getAggregatedLogsHandler).Methods("GET")
 	apiRouter.HandleFunc("/projects/{projectId}/logs/{logId}", getLogHandler).Methods("GET")
 
 	port := os.Getenv("BACKEND_API_PORT")
@@ -504,6 +505,60 @@ func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusAccepted, map[string]string{"status": "log accepted"})
+}
+
+type AggregatedLog struct {
+	EventName  string    `json:"event_name"`
+	TotalCount int       `json:"total_count"`
+	LastSeen   time.Time `json:"last_seen"`
+}
+
+func getAggregatedLogsHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "logsys-session")
+	userID, ok := session.Values["user_id"].(string)
+	if !ok {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+	projectID := vars["projectId"]
+
+	// Check if user has access to the project
+	var accessCheck int
+	err := db.QueryRow("SELECT 1 FROM user_project_access WHERE user_id = $1 AND project_id = $2", userID, projectID).Scan(&accessCheck)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusForbidden, "You do not have access to this project")
+		} else {
+			respondWithError(w, http.StatusInternalServerError, "Database error on access check")
+		}
+		return
+	}
+
+	// Build the aggregation query
+	sql := "SELECT event_name, count(), max(event_timestamp) FROM logs WHERE project_id = ? GROUP BY event_name"
+	args := []interface{}{projectID}
+
+	// Execute the query
+	rows, err := chConn.Query(r.Context(), sql, args...)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to query aggregated logs from ClickHouse")
+		return
+	}
+	defer rows.Close()
+
+	var aggregatedLogs []AggregatedLog
+	for rows.Next() {
+		var aggLog AggregatedLog
+		if err := rows.Scan(&aggLog.EventName, &aggLog.TotalCount, &aggLog.LastSeen); err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to scan aggregated log")
+			return
+		}
+		aggregatedLogs = append(aggregatedLogs, aggLog)
+	}
+
+	respondWithJSON(w, http.StatusOK, aggregatedLogs)
 }
 
 func queryLogsHandler(w http.ResponseWriter, r *http.Request) {

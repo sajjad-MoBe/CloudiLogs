@@ -1,66 +1,212 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Projects - Log Management System</title>
     <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
     <style>
+        /* Shared "cool dark theme" with yellow accents */
+        :root {
+            --bg: #1a1a1a;
+            --accent-bg: #242424;
+            --text: #e2e2e2;
+            --accent: #ffc107; /* simple.css default yellow */
+            --border: #333;
+            --form-bg: #2d2d2d;
+            --hover-bg: #2c2c2c;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* --- Full-Width Header Styling --- */
+        header {
+            background-color: var(--accent-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+        .header-container {
+             max-width: 1200px;
+             margin: 0 auto;
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+        }
+        header h1 {
+            margin: 0; /* Remove default margins */
+        }
+        header p {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        #logout-btn {
+            background-color: var(--form-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            margin: 0;
+            padding: 0.5rem 1rem;
+        }
+        #logout-btn:hover {
+            background-color: var(--border);
+            border-color: #555;
+        }
+
+        main {
+            max-width: 1200px;
+        }
+        
+        /* Card container for forms and tables */
+        .card {
+            background-color: var(--accent-bg);
+            padding: 2rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        /* --- Dark Theme Table Styling --- */
+        #projects-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        #projects-table th, #projects-table td {
+            border: none;
+            border-bottom: 1px solid var(--border);
+            padding: 1rem;
+            text-align: left;
+        }
+        #projects-table tbody tr:last-child td {
+             border-bottom: none;
+        }
+        #projects-table th {
+            background-color: #333;
+            color: var(--text);
+            font-weight: 600;
+        }
         .api-key {
-            background-color: #f0f0f0;
-            padding: 5px;
+            background-color: var(--form-bg);
+            padding: 5px 8px;
             border-radius: 5px;
             font-family: monospace;
             cursor: pointer;
+            border: 1px solid var(--border);
+            transition: background-color 0.2s ease;
         }
+        .api-key:hover {
+            background-color: #444;
+        }
+
+
+        /* --- Form Styling --- */
+        form h2 {
+            text-align: center;
+        }
+        form p {
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 1rem;
+        }
+        form p:last-child {
+            text-align: center;
+        }
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            background-color: var(--form-bg);
+            border-color: var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            width: 100%;
+        }
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.25);
+        }
+        button[type="submit"] {
+            background-color: var(--accent);
+            border: none;
+            font-weight: 600;
+            color: #1a1a1a;
+            padding-left: 2rem;
+            padding-right: 2rem;
+        }
+        button[type="submit"]:hover {
+            background-color: #e0a800;
+        }
+        #create-error-message {
+            text-align: center;
+        }
+
     </style>
 </head>
 <body>
     <header>
-        <h1>Projects</h1>
-        <p>Welcome, <span id="username"></span>! <button id="logout-btn">Logout</button></p>
+        <div class="header-container">
+            <h1>Projects</h1>
+            <p>Welcome, <span id="username">User</span>! <button id="logout-btn">Logout</button></p>
+        </div>
     </header>
     <main>
-        <h2>My Projects</h2>
-        <table id="projects-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>API Key</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Project rows will be inserted here -->
-            </tbody>
-        </table>
-        <p id="no-projects" style="display: none;">You don't have any projects yet.</p>
+        <div class="card">
+            <h2>My Projects</h2>
+            <table id="projects-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>API Key</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>My First App</td>
+                        <td>The primary application for my side project.</td>
+                        <td><span class="api-key" title="Click to copy">a1b2c3d4-e5f6...</span></td>
+                    </tr>
+                     <tr>
+                        <td>Staging Environment</td>
+                        <td>For testing new features before deployment.</td>
+                        <td><span class="api-key" title="Click to copy">z9y8x7w6-v5u4...</span></td>
+                    </tr>
+                </tbody>
+            </table>
+            <p id="no-projects" style="display: none;">You don't have any projects yet.</p>
+        </div>
 
-        <hr>
-
-        <h2>Create New Project</h2>
-        <form id="create-project-form">
-            <p>
-                <label for="name">Project Name</label>
-                <input type="text" id="name" name="name" required>
-            </p>
-            <p>
-                <label for="description">Description</label>
-                <textarea id="description" name="description" rows="3"></textarea>
-            </p>
-            <p>
-                <label for="searchable_keys">Searchable Keys (comma-separated)</label>
-                <input type="text" id="searchable_keys" name="searchable_keys">
-            </p>
-            <p>
-                <label for="log_ttl_seconds">Log TTL (in seconds)</label>
-                <input type="number" id="log_ttl_seconds" name="log_ttl_seconds" value="604800" required>
-            </p>
-            <p>
-                <button type="submit">Create Project</button>
-            </p>
-        </form>
-        <p id="create-error-message" style="color: red;"></p>
+        <div class="card">
+            <h2>Create New Project</h2>
+            <form id="create-project-form">
+                <p>
+                    <label for="name">Project Name</label>
+                    <input type="text" id="name" name="name" required>
+                </p>
+                <p>
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" rows="3"></textarea>
+                </p>
+                <p>
+                    <label for="searchable_keys">Searchable Keys (comma-separated)</label>
+                    <input type="text" id="searchable_keys" name="searchable_keys">
+                </p>
+                <p>
+                    <label for="log_ttl_seconds">Log TTL (in seconds)</label>
+                    <input type="number" id="log_ttl_seconds" name="log_ttl_seconds" value="604800" required>
+                </p>
+                <p>
+                    <button type="submit">Create Project</button>
+                </p>
+            </form>
+            <p id="create-error-message"></p>
+        </div>
     </main>
     <script type="module" src="/js/projects.js"></script>
 </body>

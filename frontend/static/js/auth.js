@@ -19,14 +19,14 @@ export async function logout() {
         console.error("Logout failed", error);
     } finally {
         currentUser = null;
-        window.location.href = '/static/index.html';
+        window.location.href = '/index.html';
     }
 }
 
 export function redirectToLogin() {
-    window.location.href = '/static/index.html';
+    window.location.href = '/index.html';
 }
 
 export function redirectToProjects() {
-    window.location.href = '/static/projects.html';
+    window.location.href = '/projects.html';
 }

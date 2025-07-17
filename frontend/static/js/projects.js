@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             projects.forEach(project => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${project.name}</td>
+                    <td><a href="/logs.html?projectId=${project.id}&projectName=${project.name}">${project.name}</a></td>
                     <td>${project.description || ''}</td>
                     <td data-project-id="${project.id}">
                         <button class="get-api-key-btn">Show API Key</button>
@@ -116,6 +116,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     logoutBtn.addEventListener('click', logout);
     createProjectForm.addEventListener('submit', handleCreateProject);
     projectsTableBody.addEventListener('click', (e) => {
+        if (e.target.tagName === 'A') {
+            e.preventDefault();
+            window.location.href = e.target.href;
+        }
         handleGetApiKey(e);
         handleCopyToClipboard(e);
     });

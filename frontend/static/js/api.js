@@ -41,4 +41,9 @@ export const api = {
     getProjects: () => request('/projects'),
     createProject: (projectData) => request('/projects', { body: projectData }),
     getApiKey: (projectId) => request(`/projects/${projectId}/apikey`),
+    getLogs: (projectId, params) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/projects/${projectId}/logs?${query}`);
+    },
+    getLog: (projectId, logId) => request(`/projects/${projectId}/logs/${logId}`),
 };

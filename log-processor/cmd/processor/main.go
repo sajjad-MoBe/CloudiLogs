@@ -23,7 +23,13 @@ const (
 	retryInterval     = 5 * time.Second
 )
 
-// LogPayload defines the structure of the log data received from Kafka.
+// KafkaLogMessage defines the structure of the message received from Kafka.
+type KafkaLogMessage struct {
+	ProjectID string          `json:"project_id"`
+	Payload   json.RawMessage `json:"payload"`
+}
+
+// LogPayload defines the structure of the actual log data.
 type LogPayload struct {
 	Name           string            `json:"name"`
 	Timestamp      time.Time         `json:"timestamp"`
@@ -80,10 +86,15 @@ func main() {
 			continue
 		}
 
-		projectID := string(m.Key)
-		var payload LogPayload
-		if err := json.Unmarshal(m.Value, &payload); err != nil {
-			log.Printf("Error unmarshalling log payload: %v. Message: %s", err, string(m.Value))
+		var kafkaMsg KafkaLogMessage
+		if err := json.Unmarshal(m.Value, &kafkaMsg); err != nil {
+			log.Printf("Error unmarshalling Kafka message: %v. Message: %s", err, string(m.Value))
+			continue
+		}
+
+		var logPayload LogPayload
+		if err := json.Unmarshal(kafkaMsg.Payload, &logPayload); err != nil {
+			log.Printf("Error unmarshalling log payload: %v. Payload: %s", err, string(kafkaMsg.Payload))
 			continue
 		}
 
@@ -92,24 +103,22 @@ func main() {
 		// Insert into Cassandra
 		if err := session.Query(
 			`INSERT INTO logs (project_id, event_timestamp, log_id, payload) VALUES (?, ?, ?, ?)`,
-			projectID, payload.Timestamp, logID, string(m.Value),
+			kafkaMsg.ProjectID, logPayload.Timestamp, logID, string(kafkaMsg.Payload),
 		).Exec(); err != nil {
 			log.Printf("Failed to insert log into Cassandra: %v", err)
-			// Decide on error handling: continue, retry, or dead-letter queue
 			continue
 		}
 
 		// Insert into ClickHouse
 		if err := chConn.Exec(context.Background(),
 			`INSERT INTO logs (project_id, event_name, event_timestamp, log_id, searchable_keys) VALUES (?, ?, ?, ?, ?)`,
-			projectID, payload.Name, payload.Timestamp, logID.String(), payload.SearchableKeys,
+			kafkaMsg.ProjectID, logPayload.Name, logPayload.Timestamp, logID.String(), logPayload.SearchableKeys,
 		); err != nil {
 			log.Printf("Failed to insert log into ClickHouse: %v", err)
-			// Decide on error handling
 			continue
 		}
 
-		log.Printf("Processed log for project %s with ID %s", projectID, logID)
+		log.Printf("Processed log for project %s with ID %s", kafkaMsg.ProjectID, logID)
 	}
 }
 

@@ -238,8 +238,8 @@ services:
     depends_on:
       - kafka
       - cassandra1
-      # - cassandra2
-      # - cassandra3
+      - cassandra2
+      - cassandra3
       - clickhouse
     environment:
       - KAFKA_BROKER=kafka:9092

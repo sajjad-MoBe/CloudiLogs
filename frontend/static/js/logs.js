@@ -45,8 +45,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${log.event_name}</td>
-                    <td>${new Date(log.timestamp).toLocaleString()}</td>
-                    <td><button class="view-details-btn" data-index="${index}">View</button></td>
+                    <td>${log.total_count}</td>
+                    <td>${new Date(log.last_seen).toLocaleString()}</td>
+                    <td><button class="view-details-btn" data-event-name="${log.event_name}">View Logs</button></td>
                 `;
                 logsTbody.appendChild(row);
             });
@@ -55,12 +56,39 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const fetchAndRenderLogs = async (params) => {
         try {
-            logs = await api.getLogs(projectId, params);
+            logs = await api.getAggregatedLogs(projectId, params);
             renderLogs();
         } catch (error) {
             console.error('Error fetching logs:', error);
             noLogsMessage.textContent = 'Failed to load logs.';
             noLogsMessage.style.display = 'block';
+        }
+    };
+
+    const renderIndividualLogs = (individualLogs) => {
+        logDetailsContent.innerHTML = ''; // Clear previous details
+        if (individualLogs.length === 0) {
+            logDetailsContent.textContent = 'No individual logs found for this event.';
+        } else {
+            const list = document.createElement('ul');
+            individualLogs.forEach(log => {
+                const item = document.createElement('li');
+                item.textContent = JSON.stringify(log, null, 2);
+                list.appendChild(item);
+            });
+            logDetailsContent.appendChild(list);
+        }
+        logDetailsContainer.style.display = 'block';
+    };
+
+    const fetchIndividualLogs = async (eventName) => {
+        try {
+            const individualLogs = await api.getLogs(projectId, { event_name: eventName });
+            renderIndividualLogs(individualLogs);
+        } catch (error) {
+            console.error('Error fetching individual logs:', error);
+            logDetailsContent.textContent = 'Failed to load individual logs.';
+            logDetailsContainer.style.display = 'block';
         }
     };
 
@@ -92,8 +120,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const handleViewDetails = (e) => {
         if (!e.target.classList.contains('view-details-btn')) return;
-        const index = parseInt(e.target.dataset.index, 10);
-        showLogDetails(index);
+        const eventName = e.target.dataset.eventName;
+        fetchIndividualLogs(eventName);
     };
 
     const handlePrevLog = () => {

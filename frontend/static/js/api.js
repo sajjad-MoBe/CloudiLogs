@@ -45,5 +45,9 @@ export const api = {
         const query = new URLSearchParams(params).toString();
         return request(`/projects/${projectId}/logs?${query}`);
     },
+    getAggregatedLogs: (projectId, params) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/projects/${projectId}/logs/aggregated?${query}`);
+    },
     getLog: (projectId, logId) => request(`/projects/${projectId}/logs/${logId}`),
 };

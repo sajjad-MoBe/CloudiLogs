@@ -166,8 +166,8 @@ services:
       - CASSANDRA_BROADCAST_ADDRESS=cassandra1
       - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra1
       - CASSANDRA_LISTEN_ADDRESS=auto
-      - MAX_HEAP_SIZE=2G
-      - HEAP_NEWSIZE=400M
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=200M
     volumes:
       - cassandra1_data:/var/lib/cassandra
     restart: always
@@ -187,8 +187,8 @@ services:
       - CASSANDRA_BROADCAST_ADDRESS=cassandra2
       - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra2
       - CASSANDRA_LISTEN_ADDRESS=auto
-      - MAX_HEAP_SIZE=2G
-      - HEAP_NEWSIZE=400M
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=200M
     volumes:
       - cassandra2_data:/var/lib/cassandra
     restart: always
@@ -209,8 +209,8 @@ services:
       - CASSANDRA_BROADCAST_ADDRESS=cassandra3
       - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra3
       - CASSANDRA_LISTEN_ADDRESS=auto
-      - MAX_HEAP_SIZE=2G
-      - HEAP_NEWSIZE=400M
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=200M
     volumes:
       - cassandra3_data:/var/lib/cassandra
     restart: always

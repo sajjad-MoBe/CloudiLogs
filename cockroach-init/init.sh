@@ -2,7 +2,9 @@
 set -e
 
 sleep 15
+set +e
 /cockroach/cockroach init --insecure --host=roach1
+set -e
 
 
 # Create the logsdb database if it doesn't exist

@@ -421,11 +421,11 @@ func getProjectAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type Log struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"project_id"`
-	EventName string    `json:"event_name"`
-	Timestamp time.Time `json:"timestamp"`
-	Payload   string    `json:"payload"`
+	ID        string          `json:"id"`
+	ProjectID string          `json:"project_id"`
+	EventName string          `json:"event_name"`
+	Timestamp time.Time       `json:"timestamp"`
+	Payload   json.RawMessage `json:"payload"`
 }
 
 func logsHandler(w http.ResponseWriter, r *http.Request) {
@@ -437,6 +437,11 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
+}
+
+type KafkaLogMessage struct {
+	ProjectID string          `json:"project_id"`
+	Payload   json.RawMessage `json:"payload"`
 }
 
 func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
@@ -470,11 +475,24 @@ func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create the structured message for Kafka
+	kafkaMsg := KafkaLogMessage{
+		ProjectID: projectID,
+		Payload:   json.RawMessage(body),
+	}
+
+	kafkaMsgBytes, err := json.Marshal(kafkaMsg)
+	if err != nil {
+		log.Printf("Failed to marshal Kafka message: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to process log")
+		return
+	}
+
 	// Construct the message for Kafka
 	// We use the project ID as the key to ensure logs for the same project go to the same partition
 	msg := kafka.Message{
 		Key:   []byte(projectID),
-		Value: body,
+		Value: kafkaMsgBytes,
 	}
 
 	// Write the message to Kafka
@@ -519,7 +537,7 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 	offsetStr := r.URL.Query().Get("offset")
 
 	var args []interface{}
-	sql := "SELECT log_id, event_name, event_timestamp, searchable_keys FROM logs WHERE project_id = ?"
+	sql := "SELECT log_id, event_name, event_timestamp FROM logs WHERE project_id = ?"
 	args = append(args, projectID)
 
 	if eventName != "" {
@@ -569,16 +587,25 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var logs []Log
 	for rows.Next() {
-		var log Log
-		var searchableKeys map[string]string
-		if err := rows.Scan(&log.ID, &log.EventName, &log.Timestamp, &searchableKeys); err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Failed to scan log")
+		var logItem Log
+		if err := rows.Scan(&logItem.ID, &logItem.EventName, &logItem.Timestamp); err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to scan log from ClickHouse")
 			return
 		}
-		log.ProjectID = projectID
-		// a simple way to represent payload
-		log.Payload = fmt.Sprintf("%v", searchableKeys)
-		logs = append(logs, log)
+		logItem.ProjectID = projectID
+
+		// Fetch the full payload from Cassandra
+		var payloadStr string
+		if err := cassandra.Query("SELECT payload FROM logs WHERE project_id = ? AND event_timestamp = ? AND log_id = ?",
+			logItem.ProjectID, logItem.Timestamp, logItem.ID).Scan(&payloadStr); err != nil {
+			if err != gocql.ErrNotFound {
+				log.Printf("Failed to query log payload from Cassandra: %v", err)
+			}
+		} else {
+			logItem.Payload = json.RawMessage(payloadStr)
+		}
+
+		logs = append(logs, logItem)
 	}
 
 	respondWithJSON(w, http.StatusOK, logs)

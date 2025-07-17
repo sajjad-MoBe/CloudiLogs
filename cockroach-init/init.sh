@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-sleep(15)
+sleep 15
 /cockroach/cockroach init --insecure --host=roach1
 
 

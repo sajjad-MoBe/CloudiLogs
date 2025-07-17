@@ -551,10 +551,12 @@ func getAggregatedLogsHandler(w http.ResponseWriter, r *http.Request) {
 	var aggregatedLogs []AggregatedLog
 	for rows.Next() {
 		var aggLog AggregatedLog
-		if err := rows.Scan(&aggLog.EventName, &aggLog.TotalCount, &aggLog.LastSeen); err != nil {
+		var totalCount uint64
+		if err := rows.Scan(&aggLog.EventName, &totalCount, &aggLog.LastSeen); err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Failed to scan aggregated log")
 			return
 		}
+		aggLog.TotalCount = int(totalCount)
 		aggregatedLogs = append(aggregatedLogs, aggLog)
 	}
 

@@ -3,13 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
+	// "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/gocql/gocql"
 	"github.com/segmentio/kafka-go"
 )
@@ -120,109 +119,4 @@ func main() {
 
 		log.Printf("Processed log for project %s with ID %s", kafkaMsg.ProjectID, logID)
 	}
-}
-
-func connectToCassandra() *gocql.Session {
-	cassandraHosts := strings.Split(os.Getenv("CASSANDRA_HOSTS"), ",")
-	if len(cassandraHosts) == 0 || cassandraHosts[0] == "" {
-		log.Fatal("CASSANDRA_HOSTS environment variable is not set")
-	}
-
-	var session *gocql.Session
-	var err error
-
-	for i := 0; i < maxRetries; i++ {
-		log.Printf("Connecting to Cassandra cluster at %v (attempt %d/%d)", cassandraHosts, i+1, maxRetries)
-		cluster := gocql.NewCluster(cassandraHosts...)
-		cluster.Keyspace = "system"
-		session, err = cluster.CreateSession()
-		if err == nil {
-			log.Println("Successfully connected to Cassandra.")
-			return session
-		}
-		log.Printf("Cassandra connection failed: %v. Retrying in %v...", err, retryInterval)
-		time.Sleep(retryInterval)
-	}
-	log.Fatalf("Could not connect to Cassandra after %d attempts: %v", maxRetries, err)
-	return nil
-}
-
-func connectToClickHouse() clickhouse.Conn {
-	clickhouseHost := os.Getenv("CLICKHOUSE_HOST")
-	if clickhouseHost == "" {
-		log.Fatal("CLICKHOUSE_HOST environment variable is not set")
-	}
-	clickhouseAddr := fmt.Sprintf("%s:9000", clickhouseHost)
-
-	var conn clickhouse.Conn
-	var err error
-
-	for i := 0; i < maxRetries; i++ {
-		log.Printf("Connecting to ClickHouse at %s (attempt %d/%d)", clickhouseAddr, i+1, maxRetries)
-		conn, err = clickhouse.Open(&clickhouse.Options{
-			Addr:        []string{clickhouseAddr},
-			Auth:        clickhouse.Auth{Database: "default"},
-			DialTimeout: time.Second * 5,
-		})
-		if err == nil {
-			if err := conn.Ping(context.Background()); err == nil {
-				log.Println("Successfully connected to ClickHouse.")
-				return conn
-			} else {
-				err = fmt.Errorf("ping failed: %w", err)
-			}
-		}
-		log.Printf("ClickHouse connection failed: %v. Retrying in %v...", err, retryInterval)
-		time.Sleep(retryInterval)
-	}
-	log.Fatalf("Could not connect to ClickHouse after %d attempts: %v", maxRetries, err)
-	return nil
-}
-
-func initCassandra(session *gocql.Session) {
-	log.Println("Initializing Cassandra schema...")
-	// Create Keyspace
-	err := session.Query(fmt.Sprintf(`
-		CREATE KEYSPACE IF NOT EXISTS %s
-		WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}
-	`, cassandraKeyspace)).Exec()
-	if err != nil {
-		log.Fatalf("Failed to create Cassandra keyspace: %v", err)
-	}
-
-	// Create Table
-	err = session.Query(fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s.%s (
-			project_id text,
-			event_timestamp timestamp,
-			log_id timeuuid,
-			payload text,
-			PRIMARY KEY (project_id, event_timestamp, log_id)
-		) WITH CLUSTERING ORDER BY (event_timestamp DESC, log_id DESC)
-	`, cassandraKeyspace, cassandraTable)).Exec()
-	if err != nil {
-		log.Fatalf("Failed to create Cassandra table: %v", err)
-	}
-	log.Println("Cassandra schema initialized successfully.")
-}
-
-func initClickHouse(conn clickhouse.Conn) {
-	log.Println("Initializing ClickHouse schema...")
-	err := conn.Exec(context.Background(), fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			project_id String,
-			event_name String,
-			event_timestamp DateTime,
-			log_id UUID,
-			searchable_keys Map(String, String),
-			received_at DateTime DEFAULT now()
-		) ENGINE = MergeTree()
-		PARTITION BY toYYYYMM(event_timestamp)
-		ORDER BY (project_id, event_name, event_timestamp)
-	`, clickhouseTable))
-
-	if err != nil {
-		log.Fatalf("Failed to create ClickHouse table: %v", err)
-	}
-	log.Println("ClickHouse schema initialized successfully.")
 }

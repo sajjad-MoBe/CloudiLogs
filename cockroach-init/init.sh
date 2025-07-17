@@ -1,21 +1,9 @@
 #!/bin/sh
 set -e
 
-# Wait for CockroachDB node to be ready (using node status)
-echo "Waiting for CockroachDB to be ready..."
-until /cockroach/cockroach node status --insecure --host=roach1 > /dev/null 2>&1; do
-  sleep 1
-  echo "Waiting for CockroachDB..."
-done
-echo "CockroachDB is ready."
+sleep(15)
+/cockroach/cockroach init --insecure --host=roach1
 
-# Check if the cluster is already initialized
-if /cockroach/cockroach node status --insecure --host=roach1 | grep -q "id"; then
-  echo "Cluster already initialized."
-else
-  echo "Initializing cluster..."
-  /cockroach/cockroach init --insecure --host=roach1
-fi
 
 # Create the logsdb database if it doesn't exist
 /cockroach/cockroach sql --insecure --host=roach1 -e "CREATE DATABASE IF NOT EXISTS logsdb;"

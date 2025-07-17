@@ -102,7 +102,7 @@ func main() {
 		// Insert into Cassandra
 		if err := session.Query(
 			`INSERT INTO logs (project_id, event_timestamp, log_id, payload) VALUES (?, ?, ?, ?)`,
-			kafkaMsg.ProjectID, logPayload.Timestamp, logID, string(kafkaMsg.Payload),
+			kafkaMsg.ProjectID, logPayload.Timestamp, logID, string(logPayload.FullPayload),
 		).Exec(); err != nil {
 			log.Printf("Failed to insert log into Cassandra: %v", err)
 			continue

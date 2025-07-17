@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 	"time"
+
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/gocql/gocql"
 	// "github.com/segmentio/kafka-go"
 )
-
 
 func connectToCassandra() *gocql.Session {
 	cassandraHosts := strings.Split(os.Getenv("CASSANDRA_HOSTS"), ",")
@@ -59,8 +59,6 @@ func connectToClickHouse() clickhouse.Conn {
 			if err := conn.Ping(context.Background()); err == nil {
 				log.Println("Successfully connected to ClickHouse.")
 				return conn
-			} else {
-				err = fmt.Errorf("ping failed: %w", err)
 			}
 		}
 		log.Printf("ClickHouse connection failed: %v. Retrying in %v...", err, retryInterval)

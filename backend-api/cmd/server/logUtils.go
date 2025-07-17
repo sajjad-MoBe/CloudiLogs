@@ -2,27 +2,27 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"	
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
+
 	"github.com/gocql/gocql"
 	"github.com/gorilla/mux"
 	"github.com/segmentio/kafka-go"
-	"strconv"
-	"strings"
-	"io"
 )
 
-
-
 type Log struct {
-	ID        string          `json:"id"`
-	ProjectID string          `json:"project_id"`
-	EventName string          `json:"event_name"`
-	Timestamp time.Time       `json:"timestamp"`
-	Payload   json.RawMessage `json:"payload"`
+	ID             string            `json:"id"`
+	ProjectID      string            `json:"project_id"`
+	EventName      string            `json:"event_name"`
+	Timestamp      time.Time         `json:"timestamp"`
+	SearchableKeys map[string]string `json:"searchable_keys"`
+	Payload        json.RawMessage   `json:"payload"`
 }
 
 func logsHandler(w http.ResponseWriter, r *http.Request) {
@@ -190,7 +190,7 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 	offsetStr := r.URL.Query().Get("offset")
 
 	var args []interface{}
-	sql := "SELECT log_id, event_name, event_timestamp FROM logs WHERE project_id = ?"
+	sql := "SELECT log_id, event_name, event_timestamp, searchable_keys FROM logs WHERE project_id = ?"
 	args = append(args, projectID)
 
 	if eventName != "" {
@@ -241,7 +241,7 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 	var logs []Log
 	for rows.Next() {
 		var logItem Log
-		if err := rows.Scan(&logItem.ID, &logItem.EventName, &logItem.Timestamp); err != nil {
+		if err := rows.Scan(&logItem.ID, &logItem.EventName, &logItem.Timestamp, &logItem.SearchableKeys); err != nil {
 			RespondWithError(w, http.StatusInternalServerError, "Failed to scan log from ClickHouse")
 			return
 		}

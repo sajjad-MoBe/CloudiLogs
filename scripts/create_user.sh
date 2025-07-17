@@ -22,11 +22,20 @@ echo "Email: $EMAIL"
 echo "Full Name: $FULLNAME"
 echo "------------------------------------"
 
-docker-compose exec backend-api /app/user-creator \
-    -username "$USERNAME" \
-    -password "$PASSWORD" \
-    -email "$EMAIL" \
-    -fullname "$FULLNAME"
+JSON_PAYLOAD=$(cat <<EOF
+{
+  "username": "$USERNAME",
+  "password": "$PASSWORD",
+  "full_name": "$FULLNAME",
+  "email": "$EMAIL"
+}
+EOF
+)
+
+curl -i -X POST http://localhost:8083/api/users  \
+-H "Content-Type: application/json" \
+-d "$JSON_PAYLOAD"
+
 
 echo "------------------------------------"
 echo "User creation command executed successfully."

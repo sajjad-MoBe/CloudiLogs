@@ -22,10 +22,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const searchForm = document.getElementById('search-form');
     const logsTbody = document.getElementById('logs-tbody');
     const noLogsMessage = document.getElementById('no-logs');
-    const logDetailsContainer = document.getElementById('log-details-container');
+    const logDetailsModal = document.getElementById('log-details-modal');
     const logDetailsContent = document.getElementById('log-details-content');
     const prevLogBtn = document.getElementById('prev-log-btn');
     const nextLogBtn = document.getElementById('next-log-btn');
+    const closeBtn = document.querySelector('.close-btn');
 
     // State
     let logs = [];
@@ -33,6 +34,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentSearchParams = null;
 
     // Functions
+    const showModal = () => {
+        logDetailsModal.style.display = 'block';
+    };
+
+    const hideModal = () => {
+        logDetailsModal.style.display = 'none';
+    };
+
     const renderLogs = () => {
         logsTbody.innerHTML = '';
         if (logs.length === 0) {
@@ -65,30 +74,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    const renderIndividualLogs = (individualLogs) => {
-        logDetailsContent.innerHTML = ''; // Clear previous details
+    const renderIndividualLogs = () => {
         if (individualLogs.length === 0) {
             logDetailsContent.textContent = 'No individual logs found for this event.';
+            prevLogBtn.style.display = 'none';
+            nextLogBtn.style.display = 'none';
         } else {
-            const list = document.createElement('ul');
-            individualLogs.forEach(log => {
-                const item = document.createElement('li');
-                item.textContent = JSON.stringify(log, null, 2);
-                list.appendChild(item);
-            });
-            logDetailsContent.appendChild(list);
+            logDetailsContent.textContent = JSON.stringify(individualLogs[currentLogIndex], null, 2);
+            prevLogBtn.style.display = 'inline-block';
+            nextLogBtn.style.display = 'inline-block';
+            updateNavButtons();
         }
-        logDetailsContainer.style.display = 'block';
     };
 
     const fetchIndividualLogs = async (eventName) => {
         try {
-            const individualLogs = await api.getLogs(projectId, { event_name: eventName });
-            renderIndividualLogs(individualLogs);
+            individualLogs = await api.getLogs(projectId, { event_name: eventName });
+            currentLogIndex = 0;
+            renderIndividualLogs();
+            showModal();
         } catch (error) {
             console.error('Error fetching individual logs:', error);
-            logDetailsContent.textContent = 'Failed to load individual logs.';
-            logDetailsContainer.style.display = 'block';
+            alert('Failed to load individual logs.');
         }
     };
 
@@ -102,7 +109,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const updateNavButtons = () => {
         prevLogBtn.disabled = currentLogIndex <= 0;
-        nextLogBtn.disabled = currentLogIndex >= logs.length - 1;
+        nextLogBtn.disabled = currentLogIndex >= individualLogs.length - 1;
     };
 
     const handleSearch = async (e) => {
@@ -126,13 +133,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const handlePrevLog = () => {
         if (currentLogIndex > 0) {
-            showLogDetails(currentLogIndex - 1);
+            currentLogIndex--;
+            renderIndividualLogs();
         }
     };
 
     const handleNextLog = () => {
-        if (currentLogIndex < logs.length - 1) {
-            showLogDetails(currentLogIndex + 1);
+        if (currentLogIndex < individualLogs.length - 1) {
+            currentLogIndex++;
+            renderIndividualLogs();
         }
     };
 
@@ -143,6 +152,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     logsTbody.addEventListener('click', handleViewDetails);
     prevLogBtn.addEventListener('click', handlePrevLog);
     nextLogBtn.addEventListener('click', handleNextLog);
+    closeBtn.addEventListener('click', hideModal);
+    window.addEventListener('click', (e) => {
+        if (e.target == logDetailsModal) {
+            hideModal();
+        }
+    });
 
     // Initial Load
     fetchAndRenderLogs({});

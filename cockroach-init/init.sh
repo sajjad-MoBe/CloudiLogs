@@ -1,13 +1,13 @@
 #!/bin/sh
 set -e
 
-# Wait for CockroachDB to be ready
-until /cockroach/cockroach sql --insecure --host=roach1 -e "SELECT 1" > /dev/null 2>&1 || \
-      /cockroach/cockroach sql --insecure --host=roach2 -e "SELECT 1" > /dev/null 2>&1 || \
-      /cockroach/cockroach sql --insecure --host=roach3 -e "SELECT 1" > /dev/null 2>&1; do
-  echo "Waiting for CockroachDB..."
+# Wait for CockroachDB node to be ready (using node status)
+echo "Waiting for CockroachDB to be ready..."
+until /cockroach/cockroach node status --insecure --host=roach1 > /dev/null 2>&1; do
   sleep 1
+  echo "Waiting for CockroachDB..."
 done
+echo "CockroachDB is ready."
 
 # Check if the cluster is already initialized
 if /cockroach/cockroach node status --insecure --host=roach1 | grep -q "id"; then

@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // State
     let logs = [];
+    let individualLogs = [];
     let currentLogIndex = -1;
     let currentSearchParams = null;
 
@@ -74,24 +75,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    const renderIndividualLogs = () => {
-        if (individualLogs.length === 0) {
-            logDetailsContent.textContent = 'No individual logs found for this event.';
-            prevLogBtn.style.display = 'none';
-            nextLogBtn.style.display = 'none';
-        } else {
-            logDetailsContent.textContent = JSON.stringify(individualLogs[currentLogIndex], null, 2);
-            prevLogBtn.style.display = 'inline-block';
-            nextLogBtn.style.display = 'inline-block';
-            updateNavButtons();
-        }
-    };
-
     const fetchIndividualLogs = async (eventName) => {
         try {
             individualLogs = await api.getLogs(projectId, { event_name: eventName });
             currentLogIndex = 0;
-            renderIndividualLogs();
+            showLogDetails(currentLogIndex);
             showModal();
         } catch (error) {
             console.error('Error fetching individual logs:', error);
@@ -101,9 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const showLogDetails = (index) => {
         currentLogIndex = index;
-        const log = logs[index];
-        logDetailsContent.textContent = JSON.stringify(log, null, 2);
-        logDetailsContainer.style.display = 'block';
+        logDetailsContent.textContent = JSON.stringify(individualLogs[currentLogIndex], null, 2);
         updateNavButtons();
     };
 
@@ -133,15 +119,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const handlePrevLog = () => {
         if (currentLogIndex > 0) {
-            currentLogIndex--;
-            renderIndividualLogs();
+            showLogDetails(currentLogIndex - 1);
         }
     };
 
     const handleNextLog = () => {
         if (currentLogIndex < individualLogs.length - 1) {
-            currentLogIndex++;
-            renderIndividualLogs();
+            showLogDetails(currentLogIndex + 1);
         }
     };
 

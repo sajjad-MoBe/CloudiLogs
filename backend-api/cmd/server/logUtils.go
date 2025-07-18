@@ -2,27 +2,27 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"	
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
+	"sync/atomic"
 	"time"
+
 	"github.com/gocql/gocql"
 	"github.com/gorilla/mux"
 	"github.com/segmentio/kafka-go"
-	"strconv"
-	"strings"
-	"io"
 )
 
-
-
 type Log struct {
-	ID        string          `json:"id"`
-	ProjectID string          `json:"project_id"`
-	EventName string          `json:"event_name"`
-	Timestamp time.Time       `json:"timestamp"`
-	Payload   json.RawMessage `json:"payload"`
+	ID             string            `json:"id"`
+	ProjectID      string            `json:"project_id"`
+	EventName      string            `json:"event_name"`
+	Timestamp      time.Time         `json:"timestamp"`
+	SearchableKeys map[string]string `json:"searchable_keys"`
+	Payload        json.RawMessage   `json:"payload"`
 }
 
 func logsHandler(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +34,13 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		RespondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
+}
+
+type LogIngestionPayload struct {
+	Name           string            `json:"name"`
+	Timestamp      time.Time         `json:"timestamp"`
+	SearchableKeys map[string]string `json:"searchable_keys"`
+	FullPayload    json.RawMessage   `json:"full_payload"`
 }
 
 type KafkaLogMessage struct {
@@ -59,23 +66,31 @@ func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read the log payload
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		RespondWithError(w, http.StatusBadRequest, "Could not read request body")
+	// Read and validate the log payload
+	var logPayload LogIngestionPayload
+	if err := json.NewDecoder(r.Body).Decode(&logPayload); err != nil {
+		RespondWithError(w, http.StatusBadRequest, "Invalid request payload: "+err.Error())
 		return
 	}
 	defer r.Body.Close()
 
-	if len(body) == 0 {
-		RespondWithError(w, http.StatusBadRequest, "Request body is empty")
+	if logPayload.Name == "" || logPayload.Timestamp.IsZero() {
+		RespondWithError(w, http.StatusBadRequest, "Missing required fields: name and timestamp must be provided")
+		return
+	}
+
+	// Re-marshal the validated payload to be sent to Kafka
+	payloadBytes, err := json.Marshal(logPayload)
+	if err != nil {
+		log.Printf("Failed to re-marshal log payload: %v", err)
+		RespondWithError(w, http.StatusInternalServerError, "Failed to process log")
 		return
 	}
 
 	// Create the structured message for Kafka
 	kafkaMsg := KafkaLogMessage{
 		ProjectID: projectID,
-		Payload:   json.RawMessage(body),
+		Payload:   json.RawMessage(payloadBytes),
 	}
 
 	kafkaMsgBytes, err := json.Marshal(kafkaMsg)
@@ -91,6 +106,10 @@ func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 		Key:   []byte(projectID),
 		Value: kafkaMsgBytes,
 	}
+
+	// Round-robin selection of Kafka writer
+	writerIndex := atomic.AddInt64(&logCounter, 1) % int64(len(kafkaWriters))
+	kafkaWriter := kafkaWriters[writerIndex]
 
 	// Write the message to Kafka
 	err = kafkaWriter.WriteMessages(r.Context(), msg)
@@ -133,8 +152,49 @@ func getAggregatedLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build the aggregation query
-	sql := "SELECT event_name, count(), max(event_timestamp) FROM logs WHERE project_id = ? GROUP BY event_name"
+	eventName := r.URL.Query().Get("event_name")
+	startTime := r.URL.Query().Get("start_time")
+	endTime := r.URL.Query().Get("end_time")
+	searchKeysStr := r.URL.Query().Get("search_keys")
+
+	sql := "SELECT event_name, count(), max(event_timestamp) FROM logs WHERE project_id = ?"
 	args := []interface{}{projectID}
+
+	if eventName != "" {
+		sql += " AND event_name = ?"
+		args = append(args, eventName)
+	}
+	if startTime != "" {
+		formattedStartTime, err := parseAndFormatTime(startTime)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid start_time format")
+			return
+		}
+		sql += " AND event_timestamp >= ?"
+		args = append(args, formattedStartTime)
+	}
+	if endTime != "" {
+		formattedEndTime, err := parseAndFormatTime(endTime)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid end_time format")
+			return
+		}
+		sql += " AND event_timestamp <= ?"
+		args = append(args, formattedEndTime)
+	}
+	if searchKeysStr != "" {
+		searchKeys, err := parseSearchKeys(searchKeysStr)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid search_keys format")
+			return
+		}
+		for k, v := range searchKeys {
+			sql += " AND searchable_keys[?] = ?"
+			args = append(args, k, v)
+		}
+	}
+
+	sql += " GROUP BY event_name"
 
 	// Execute the query
 	rows, err := chConn.Query(r.Context(), sql, args...)
@@ -144,7 +204,7 @@ func getAggregatedLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var aggregatedLogs []AggregatedLog
+	aggregatedLogs := make([]AggregatedLog, 0)
 	for rows.Next() {
 		var aggLog AggregatedLog
 		var totalCount uint64
@@ -190,7 +250,7 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 	offsetStr := r.URL.Query().Get("offset")
 
 	var args []interface{}
-	sql := "SELECT log_id, event_name, event_timestamp FROM logs WHERE project_id = ?"
+	sql := "SELECT log_id, event_name, event_timestamp, searchable_keys FROM logs WHERE project_id = ?"
 	args = append(args, projectID)
 
 	if eventName != "" {
@@ -198,12 +258,22 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 		args = append(args, eventName)
 	}
 	if startTime != "" {
+		formattedStartTime, err := parseAndFormatTime(startTime)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid start_time format")
+			return
+		}
 		sql += " AND event_timestamp >= ?"
-		args = append(args, startTime)
+		args = append(args, formattedStartTime)
 	}
 	if endTime != "" {
+		formattedEndTime, err := parseAndFormatTime(endTime)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid end_time format")
+			return
+		}
 		sql += " AND event_timestamp <= ?"
-		args = append(args, endTime)
+		args = append(args, formattedEndTime)
 	}
 
 	if searchKeysStr != "" {
@@ -238,10 +308,10 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var logs []Log
+	logs := make([]Log, 0)
 	for rows.Next() {
 		var logItem Log
-		if err := rows.Scan(&logItem.ID, &logItem.EventName, &logItem.Timestamp); err != nil {
+		if err := rows.Scan(&logItem.ID, &logItem.EventName, &logItem.Timestamp, &logItem.SearchableKeys); err != nil {
 			RespondWithError(w, http.StatusInternalServerError, "Failed to scan log from ClickHouse")
 			return
 		}
@@ -313,4 +383,15 @@ func getLogHandler(w http.ResponseWriter, r *http.Request) {
 	log.ID = logID
 
 	RespondWithJSON(w, http.StatusOK, log)
+}
+
+func parseAndFormatTime(timeStr string) (string, error) {
+	if timeStr == "" {
+		return "", nil
+	}
+	t, err := time.Parse("2006-01-02T15:04", timeStr)
+	if err != nil {
+		return "", err
+	}
+	return t.Format("2006-01-02 15:04:05"), nil
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -16,11 +17,12 @@ import (
 )
 
 var (
-	db          *sql.DB
-	store       *sessions.CookieStore
-	kafkaWriter *kafka.Writer
-	chConn      clickhouse.Conn
-	cassandra   *gocql.Session
+	db           *sql.DB
+	store        *sessions.CookieStore
+	kafkaWriters []*kafka.Writer
+	logCounter   int64
+	chConn       clickhouse.Conn
+	cassandra    *gocql.Session
 )
 
 type User struct {
@@ -75,16 +77,19 @@ func main() {
 	}
 	log.Println("Successfully connected to CockroachDB.")
 
-	kafkaBroker := os.Getenv("KAFKA_BROKER")
-	if kafkaBroker == "" {
-		kafkaBroker = "kafka:9092"
+	kafkaBrokers := strings.Split(os.Getenv("KAFKA_BROKER"), ",")
+	if len(kafkaBrokers) == 0 {
+		log.Fatal("KAFKA_BROKER not set.")
 	}
-	kafkaWriter = &kafka.Writer{
-		Addr:     kafka.TCP(kafkaBroker),
-		Topic:    "log-events",
-		Balancer: &kafka.LeastBytes{},
+	for _, broker := range kafkaBrokers {
+		writer := &kafka.Writer{
+			Addr:     kafka.TCP(broker),
+			Topic:    "log-events",
+			Balancer: &kafka.LeastBytes{},
+		}
+		kafkaWriters = append(kafkaWriters, writer)
 	}
-	log.Printf("Kafka writer configured for broker at %s", kafkaBroker)
+	log.Printf("Kafka writers configured for brokers at %s", os.Getenv("KAFKA_BROKER"))
 
 	clickhouseHost := os.Getenv("CLICKHOUSE_HOST")
 	if clickhouseHost == "" {

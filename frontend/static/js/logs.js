@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const logDetailsContent = document.getElementById("log-details-content");
   const prevLogBtn = document.getElementById("prev-log-btn");
   const nextLogBtn = document.getElementById("next-log-btn");
+  const logIndexIndicator = document.getElementById("log-index-indicator"); // <-- Add this line
   const closeBtn = document.querySelector(".close-btn");
 
   // 3. State Management
@@ -69,7 +70,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           <td>${log.event_name}</td>
           <td>${log.total_count}</td>
           <td>${new Date(log.last_seen).toLocaleString()}</td>
-          <td><button class="view-details-btn" data-event-name="${log.event_name}">View Logs</button></td>
+          <td><button class="view-details-btn" data-event-name="${
+            log.event_name
+          }">View Logs</button></td>
         `;
         logsTbody.appendChild(row);
       });
@@ -98,11 +101,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-
   // 5. Modal and Log Details Rendering
 
-  const showModal = () => logDetailsModal.style.display = "block";
-  const hideModal = () => logDetailsModal.style.display = "none";
+  const showModal = () => (logDetailsModal.style.display = "block");
+  const hideModal = () => (logDetailsModal.style.display = "none");
 
   /**
    * Renders the detailed content for a single log inside the modal.
@@ -124,8 +126,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const primaryHTML = `
       <div class="log-details-card">
-        <div class="log-details-title">${escapeHTML(event_name || "(no event name)")}</div>
-        <span class="log-details-timestamp">${timestamp ? new Date(timestamp).toLocaleString() : ""}</span>
+        <div class="log-details-title">${escapeHTML(
+          event_name || "(no event name)"
+        )}</div>
+        <span class="log-details-timestamp">${
+          timestamp ? new Date(timestamp).toLocaleString() : ""
+        }</span>
         <div class="log-details-grid">
           <div class="log-details-key">Log ID</div>
           <div class="log-details-value">${escapeHTML(id || "")}</div>
@@ -164,12 +170,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   const updateNavButtons = () => {
     prevLogBtn.disabled = currentLogIndex <= 0;
     nextLogBtn.disabled = currentLogIndex >= individualLogs.length - 1;
+    // Update the index indicator
+    if (individualLogs.length > 0 && currentLogIndex >= 0) {
+      logIndexIndicator.textContent = `${currentLogIndex + 1} of ${
+        individualLogs.length
+      }`;
+    } else {
+      logIndexIndicator.textContent = "";
+    }
   };
 
   // Helper Functions for Rendering
   const escapeHTML = (str) => {
     if (typeof str !== "string") return "";
-    return str.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+    return str.replace(
+      /[&<>"']/g,
+      (m) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[m])
+    );
   };
 
   const renderKeyValueGrid = (obj) => {
@@ -179,12 +203,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     return (
       '<div class="log-details-grid">' +
       Object.entries(obj)
-        .map(([k, v]) => `<div class="log-details-key">${escapeHTML(k)}:</div><div class="log-details-value">${escapeHTML(String(v))}</div>`)
+        .map(
+          ([k, v]) =>
+            `<div class="log-details-key">${escapeHTML(
+              k
+            )}:</div><div class="log-details-value">${escapeHTML(
+              String(v)
+            )}</div>`
+        )
         .join("") +
       "</div>"
     );
   };
-
 
   // 6. Event Handlers
   const handleSearch = async (e) => {
@@ -197,7 +227,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       search_keys: formData.get("search_keys"),
     };
     // Filter out empty values
-    currentSearchParams = Object.fromEntries(Object.entries(params).filter(([_, v]) => v));
+    currentSearchParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v)
+    );
     await fetchAndRenderLogs(currentSearchParams);
   };
 

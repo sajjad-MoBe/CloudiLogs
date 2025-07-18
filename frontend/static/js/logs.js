@@ -98,10 +98,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Helper function to safely escape HTML
   function escapeHTML(str) {
-    if (typeof str !== 'string') return '';
-    return str.replace(/[&<>"']/g, (m) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[m]));
+    if (typeof str !== "string") return "";
+    return str.replace(
+      /[&<>"']/g,
+      (m) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[m])
+    );
   }
 
   // Helper function to render a key-value object as a grid
@@ -134,34 +142,37 @@ document.addEventListener("DOMContentLoaded", async () => {
       project_id,
       searchable_keys,
       payload,
-      ...rest // Capture any other fields
+      ...rest
     } = log;
 
-    // A primary info card
+    // Primary info card (removed emoji before event name)
     const primaryHTML = `
       <div class="log-details-card">
         <div class="log-details-title">
-          <span class="log-icon">📄</span>
           ${escapeHTML(event_name || "(no event name)")}
         </div>
         <span class="log-details-timestamp">
-          ${timestamp ? new Date(timestamp).toLocaleString() : "No timestamp"}
+          ${timestamp ? new Date(timestamp).toLocaleString() : ""}
         </span>
         <div class="log-details-grid">
-          <div class="log-details-key">Log ID:</div>
-          <div class="log-details-value">${escapeHTML(id || "N/A")}</div>
-          <div class="log-details-key">Project ID:</div>
-          <div class="log-details-value">${escapeHTML(project_id || "N/A")}</div>
+          <div class="log-details-key">Log ID</div>
+          <div class="log-details-value">${escapeHTML(id || "")}</div>
+          <div class="log-details-key">Project ID</div>
+          <div class="log-details-value">${escapeHTML(project_id || "")}</div>
         </div>
       </div>
     `;
 
-    // A section for any other top-level fields
-    const otherFieldsHTML = Object.keys(rest).length > 0
-      ? `<div class="log-details-section"><h4>Other Metadata</h4>${renderKeyValueGrid(rest)}</div>`
-      : "";
+    let otherFields = "";
+    if (Object.keys(rest).length > 0) {
+      otherFields = `
+        <div class="log-details-section">
+          <h4>Other Fields</h4>
+          ${renderKeyValueGrid(rest)}
+        </div>
+      `;
+    }
 
-    // Compose final modal content
     logDetailsContent.innerHTML = `
       <div class="log-details-main">
         ${primaryHTML}
@@ -170,11 +181,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         <h4>Searchable Keys</h4>
         ${renderKeyValueGrid(searchable_keys)}
       </div>
-      <div class="log-details-section">
+      <div class="log-details-section payload-scroll-section">
         <h4>Payload</h4>
-        ${renderKeyValueGrid(payload)}
+        <div class="payload-scroll">${renderKeyValueGrid(payload)}</div>
       </div>
-      ${otherFieldsHTML}
+      ${otherFields}
     `;
 
     updateNavButtons();

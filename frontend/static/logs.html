@@ -59,15 +59,15 @@
       form h2 {
         text-align: center;
       }
-       form p {
-         max-width: 500px;
-         margin-left: auto;
-         margin-right: auto;
-         margin-bottom: 1rem;
-       }
-       form p:last-child {
-         text-align: center;
-       }
+      form p {
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+        margin-bottom: 1rem;
+      }
+      form p:last-child {
+        text-align: center;
+      }
 
       /* --- Input Styling --- */
       input[type="text"],
@@ -128,10 +128,9 @@
       .log-table tbody tr:hover {
         background-color: var(--hover-bg);
       }
-       .log-table button {
-         font-size: 0.9rem;
-       }
-
+      .log-table button {
+        font-size: 0.9rem;
+      }
 
       /* --- Dark Theme Modal Styling --- */
       .modal {
@@ -169,10 +168,9 @@
         text-decoration: none;
         cursor: pointer;
       }
-       .log-details-nav {
-         margin-top: 20px;
-       }
-
+      .log-details-nav {
+        margin-top: 20px;
+      }
 
       /* --- Enhanced Log Details Modal Content --- */
       .log-details-structured {
@@ -260,6 +258,16 @@
       .log-details-section .log-details-grid {
         padding: 0.25rem;
       }
+
+      /* --- New Styles for Payload Section --- */
+      .payload-scroll-section .payload-scroll {
+        max-height: 220px;
+        overflow-y: auto;
+        background: #232323;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        padding: 0.5em 1em;
+      }
     </style>
   </head>
   <body>
@@ -271,26 +279,36 @@
     </header>
     <main>
       <form id="search-form">
-          <h2>Search Logs</h2>
-          <p>
-              <label for="event-name">Event Name</label>
-              <input type="text" id="event-name" name="event_name">
-          </p>
-          <p>
-              <label for="start-time">Start Time</label>
-              <input type="datetime-local" id="start-time" name="start_time" value="2025-07-17T21:09">
-          </p>
-          <p>
-              <label for="end-time">End Time</label>
-              <input type="datetime-local" id="end-time" name="end_time" value="2025-07-17T21:09">
-          </p>
-          <p>
-              <label for="search-keys">Searchable Keys (key:value, ...)</label>
-              <input type="text" id="search-keys" name="search_keys">
-          </p>
-          <p>
-              <button type="submit">Search</button>
-          </p>
+        <h2>Search Logs</h2>
+        <p>
+          <label for="event-name">Event Name</label>
+          <input type="text" id="event-name" name="event_name" />
+        </p>
+        <p>
+          <label for="start-time">Start Time</label>
+          <input
+            type="datetime-local"
+            id="start-time"
+            name="start_time"
+            value="2025-07-17T21:09"
+          />
+        </p>
+        <p>
+          <label for="end-time">End Time</label>
+          <input
+            type="datetime-local"
+            id="end-time"
+            name="end_time"
+            value="2025-07-17T21:09"
+          />
+        </p>
+        <p>
+          <label for="search-keys">Searchable Keys (key:value, ...)</label>
+          <input type="text" id="search-keys" name="search_keys" />
+        </p>
+        <p>
+          <button type="submit">Search</button>
+        </p>
       </form>
 
       <h2>Log Events</h2>
@@ -305,22 +323,22 @@
         </thead>
         <tbody id="logs-tbody">
           <tr>
-              <td>User Login Success</td>
-              <td>152</td>
-              <td>2025-07-17 21:00:00</td>
-              <td><button>View</button></td>
+            <td>User Login Success</td>
+            <td>152</td>
+            <td>2025-07-17 21:00:00</td>
+            <td><button>View</button></td>
           </tr>
           <tr>
-              <td>Payment Failed</td>
-              <td>5</td>
-              <td>2025-07-17 20:45:10</td>
-              <td><button>View</button></td>
+            <td>Payment Failed</td>
+            <td>5</td>
+            <td>2025-07-17 20:45:10</td>
+            <td><button>View</button></td>
           </tr>
-           <tr>
-              <td>API Request Timeout</td>
-              <td>23</td>
-              <td>2025-07-17 19:12:34</td>
-              <td><button>View</button></td>
+          <tr>
+            <td>API Request Timeout</td>
+            <td>23</td>
+            <td>2025-07-17 19:12:34</td>
+            <td><button>View</button></td>
           </tr>
         </tbody>
       </table>
@@ -330,8 +348,7 @@
         <div class="modal-content">
           <span class="close-btn">&times;</span>
           <h3>Log Details</h3>
-          <div id="log-details-content" class="log-details-structured">
-            </div>
+          <div id="log-details-content" class="log-details-structured"></div>
           <div class="log-details-nav">
             <button id="prev-log-btn">&larr; Previous</button>
             <button id="next-log-btn">Next &rarr;</button>

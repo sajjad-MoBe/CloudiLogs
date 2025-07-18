@@ -17,99 +17,105 @@ volumes:
   gomodcache-db-init:
 
 services:
-  # roach1:
-  #   image: cockroachdb/cockroach:v23.1.10
-  #   container_name: roach1
-  #   networks:
-  #     - lognet
-  #   ports:
-  #     - "26257:26257"
-  #     - "8080:8080"
-  #   volumes:
-  #     - roach1_data:/cockroach/cockroach-data
-  #   command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach1
-  #   healthcheck:
-  #     test: ["CMD", "/cockroach/cockroach", "node", "status", "--insecure", "--host=roach1"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  roach1:
+    image: cockroachdb/cockroach:v23.1.10
+    container_name: roach1
+    networks:
+      - lognet
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    volumes:
+      - roach1_data:/cockroach/cockroach-data
+    command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach1
+    healthcheck:
+      test: ["CMD", "/cockroach/cockroach", "node", "status", "--insecure", "--host=roach1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # roach2:
-  #   image: cockroachdb/cockroach:v23.1.10
-  #   container_name: roach2
-  #   networks:
-  #     - lognet
-  #   ports:
-  #     - "26258:26257"
-  #     - "8081:8080"
-  #   volumes:
-  #     - roach2_data:/cockroach/cockroach-data
-  #   command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach2
-  #   depends_on:
-  #     - roach1
+  roach2:
+    image: cockroachdb/cockroach:v23.1.10
+    container_name: roach2
+    networks:
+      - lognet
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    volumes:
+      - roach2_data:/cockroach/cockroach-data
+    command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach2
+    depends_on:
+      - roach1
 
-  # roach3:
-  #   image: cockroachdb/cockroach:v23.1.10
-  #   container_name: roach3
-  #   networks:
-  #     - lognet
-  #   ports:
-  #     - "26259:26257"
-  #     - "8082:8080"
-  #   volumes:
-  #     - roach3_data:/cockroach/cockroach-data
-  #   command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach3
-  #   depends_on:
-  #     - roach1
+  roach3:
+    image: cockroachdb/cockroach:v23.1.10
+    container_name: roach3
+    networks:
+      - lognet
+    ports:
+      - "26259:26257"
+      - "8082:8080"
+    volumes:
+      - roach3_data:/cockroach/cockroach-data
+    command: start --insecure --join=roach1,roach2,roach3 --advertise-addr roach3
+    depends_on:
+      - roach1
 
-  # cockroach-init:
-  #   build:
-  #     context: ./cockroach-init
-  #     dockerfile: Dockerfile
-  #   container_name: cockroach-init
-  #   networks:
-  #     - lognet
-  #   depends_on:
-  #     - roach1
-  #     - roach2
-  #     - roach3
+  cockroach-init:
+    build:
+      context: ./cockroach-init
+      dockerfile: Dockerfile
+    container_name: cockroach-init
+    networks:
+      - lognet
+    depends_on:
+      - roach1
+      - roach2
+      - roach3
 
-  # db-init:
-  #   build:
-  #     context: ./db-init
-  #     dockerfile: Dockerfile
-  #   networks:
-  #     - lognet
-  #   volumes:
-  #     - gomodcache-db-init:/go/pkg/mod
-  #   depends_on:
-  #     cockroach-init:
-  #       condition: service_completed_successfully
-  #   environment:
-  #     - COCKROACHDB_URL=postgresql://root@roach1:26257/logsdb?sslmode=disable
-  #   restart: on-failure
+  db-init:
+    build:
+      context: ./db-init
+      dockerfile: Dockerfile
+    networks:
+      - lognet
+    volumes:
+      - gomodcache-db-init:/go/pkg/mod
+    depends_on:
+      cockroach-init:
+        condition: service_completed_successfully
+    environment:
+      - COCKROACHDB_URL=postgresql://root@roach1:26257/logsdb?sslmode=disable
+    restart: on-failure
 
-  # backend-api:
-  #   build:
-  #     context: ./backend-api
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8083:8081"
-  #   networks:
-  #     - lognet
-  #   volumes:
-  #     - gomodcache-backend:/go/pkg/mod
-  #   depends_on:
-  #     db-init:
-  #       condition: service_completed_successfully
-  #   environment:
-  #     - COCKROACHDB_URL=postgresql://root@roach1:26257/logsdb?sslmode=disable
-  #     - SESSION_KEY=a-very-secret-key-for-dev-only
-  #     - BACKEND_API_PORT=8081
-  #     - KAFKA_BROKER=kafka:9092
-  #     - CLICKHOUSE_HOST=clickhouse
-  #     - CASSANDRA_HOSTS=cassandra1
-  #   restart: on-failure
+  backend-api:
+    build:
+      context: ./backend-api
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8081"
+    networks:
+      - lognet
+    volumes:
+      - gomodcache-backend:/go/pkg/mod
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka1:
+        condition: service_started
+      kafka2:
+        condition: service_started
+      kafka3:
+        condition: service_started
+    environment:
+      - COCKROACHDB_URL=postgresql://root@roach1:26257/logsdb?sslmode=disable
+      - SESSION_KEY=a-very-secret-key-for-dev-only
+      - BACKEND_API_PORT=8081
+      - KAFKA_BROKER=kafka1:9092,kafka2:9093,kafka3:9094
+      - CLICKHOUSE_HOST=clickhouse
+      - CASSANDRA_HOSTS=cassandra1
+    restart: on-failure
 
   frontend:
     build:
@@ -119,130 +125,232 @@ services:
       - "8084:80"
     networks:
       - lognet
-    # depends_on:
-    #   - backend-api
+    depends_on:
+      - backend-api
 
-  # zookeeper:
-  #   image: confluentinc/cp-zookeeper:7.3.2
-  #   container_name: zookeeper
-  #   networks:
-  #     - lognet
-  #   environment:
-  #     ZOOKEEPER_CLIENT_PORT: 2181
-  #     ZOOKEEPER_TICK_TIME: 2000
+  zookeeper1:
+    image: confluentinc/cp-zookeeper:7.3.2
+    container_name: zookeeper1
+    networks:
+      - lognet
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
 
-  # kafka:
-  #   image: confluentinc/cp-kafka:7.3.2
-  #   container_name: kafka
-  #   networks:
-  #     - lognet
-  #   ports:
-  #     - "9092:9092"
-  #   depends_on:
-  #     - zookeeper
-  #   environment:
-  #     KAFKA_BROKER_ID: 1
-  #     KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-  #     KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  #     KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-  #     KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
+  zookeeper2:
+    image: confluentinc/cp-zookeeper:7.3.2
+    container_name: zookeeper2
+    networks:
+      - lognet
+    ports:
+      - "2182:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  zookeeper3:
+    image: confluentinc/cp-zookeeper:7.3.2
+    container_name: zookeeper3
+    networks:
+      - lognet
+    ports:
+      - "2183:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka1:
+    image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka1
+    networks:
+      - lognet
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper1
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper1:2181'
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
+
+  kafka2:
+    image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka2
+    networks:
+      - lognet
+    ports:
+      - "9093:9093"
+    depends_on:
+      - zookeeper2
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper2:2181'
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9093,PLAINTEXT_HOST://localhost:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
+
+  kafka3:
+    image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka3
+    networks:
+      - lognet
+    ports:
+      - "9094:9094"
+    depends_on:
+      - zookeeper3
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper3:2181'
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9094,PLAINTEXT_HOST://localhost:29094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
 
   
-  # cassandra1:
-  #   image: cassandra:latest
-  #   container_name: cassandra1
-  #   networks:
-  #     - lognet
-  #   ports:
-  #     - "9042:9042"
-  #   environment:
-  #     - CASSANDRA_CLUSTER_NAME=log-system-cluster
-  #     - CASSANDRA_DC=dc1
-  #     - CASSANDRA_RACK=rack1
-  #     - CASSANDRA_SEEDS=cassandra1,cassandra2
-  #     - CASSANDRA_BROADCAST_ADDRESS=cassandra1
-  #     - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra1
-  #     - CASSANDRA_LISTEN_ADDRESS=auto
-  #     - MAX_HEAP_SIZE=1G
-  #     - HEAP_NEWSIZE=200M
-  #   volumes:
-  #     - cassandra1_data:/var/lib/cassandra
-  #   restart: always
+  cassandra1:
+    image: cassandra:latest
+    container_name: cassandra1
+    networks:
+      - lognet
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_CLUSTER_NAME=log-system-cluster
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra1
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra1
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=200M
+    volumes:
+      - cassandra1_data:/var/lib/cassandra
+    restart: always
 
-  # cassandra2:
-  #   image: cassandra:latest
-  #   container_name: cassandra2
-  #   networks:
-  #     - lognet
-  #   depends_on:
-  #     - cassandra1
-  #   environment:
-  #     - CASSANDRA_CLUSTER_NAME=log-system-cluster
-  #     - CASSANDRA_DC=dc1
-  #     - CASSANDRA_RACK=rack1
-  #     - CASSANDRA_SEEDS=cassandra1,cassandra2
-  #     - CASSANDRA_BROADCAST_ADDRESS=cassandra2
-  #     - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra2
-  #     - CASSANDRA_LISTEN_ADDRESS=auto
-  #     - MAX_HEAP_SIZE=1G
-  #     - HEAP_NEWSIZE=200M
-  #   volumes:
-  #     - cassandra2_data:/var/lib/cassandra
-  #   restart: always
-
-
-  # cassandra3:
-  #   image: cassandra:latest
-  #   container_name: cassandra3
-  #   networks:
-  #     - lognet
-  #   depends_on:
-  #     - cassandra1
-  #   environment:
-  #     - CASSANDRA_CLUSTER_NAME=log-system-cluster
-  #     - CASSANDRA_DC=dc1
-  #     - CASSANDRA_RACK=rack1
-  #     - CASSANDRA_SEEDS=cassandra1,cassandra2
-  #     - CASSANDRA_BROADCAST_ADDRESS=cassandra3
-  #     - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra3
-  #     - CASSANDRA_LISTEN_ADDRESS=auto
-  #     - MAX_HEAP_SIZE=1G
-  #     - HEAP_NEWSIZE=200M
-  #   volumes:
-  #     - cassandra3_data:/var/lib/cassandra
-  #   restart: always
+  cassandra2:
+    image: cassandra:latest
+    container_name: cassandra2
+    networks:
+      - lognet
+    depends_on:
+      - cassandra1
+    environment:
+      - CASSANDRA_CLUSTER_NAME=log-system-cluster
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra2
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra2
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=200M
+    volumes:
+      - cassandra2_data:/var/lib/cassandra
+    restart: always
 
 
-  # clickhouse:
-  #   image: clickhouse/clickhouse-server:23.8
-  #   container_name: clickhouse
-  #   networks:
-  #     - lognet
-  #   ports:
-  #     - "8123:8123"
-  #     - "9000:9000"
-  #   volumes:
-  #     - clickhouse_data:/var/lib/clickhouse
+  cassandra3:
+    image: cassandra:latest
+    container_name: cassandra3
+    networks:
+      - lognet
+    depends_on:
+      - cassandra1
+    environment:
+      - CASSANDRA_CLUSTER_NAME=log-system-cluster
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra1,cassandra2
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra3
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra3
+      - CASSANDRA_LISTEN_ADDRESS=auto
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=200M
+    volumes:
+      - cassandra3_data:/var/lib/cassandra
+    restart: always
 
-  # log-processor:
-  #   build:
-  #     context: ./log-processor
-  #     dockerfile: Dockerfile
-  #   networks:
-  #     - lognet
-  #   volumes:
-  #     - gomodcache-log-processor:/go/pkg/mod
-  #   depends_on:
-  #     - kafka
-  #     - cassandra1
-  #     - cassandra2
-  #     - cassandra3
-  #     - clickhouse
-  #   environment:
-  #     - KAFKA_BROKER=kafka:9092
-  #     - CASSANDRA_HOSTS=cassandra1
-  #     - CLICKHOUSE_HOST=clickhouse
-  #   restart: on-failure
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: clickhouse
+    networks:
+      - lognet
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
+  log-processor1:
+    build:
+      context: ./log-processor
+      dockerfile: Dockerfile
+    networks:
+      - lognet
+    volumes:
+      - gomodcache-log-processor:/go/pkg/mod
+    depends_on:
+      - kafka1
+      - cassandra1
+      - cassandra2
+      - cassandra3
+      - clickhouse
+    environment:
+      - KAFKA_BROKER=kafka1:9092
+      - CASSANDRA_HOSTS=cassandra1
+      - CLICKHOUSE_HOST=clickhouse
+    restart: on-failure
+
+  log-processor2:
+    build:
+      context: ./log-processor
+      dockerfile: Dockerfile
+    networks:
+      - lognet
+    volumes:
+      - gomodcache-log-processor:/go/pkg/mod
+    depends_on:
+      - kafka2
+      - cassandra1
+      - cassandra2
+      - cassandra3
+      - clickhouse
+    environment:
+      - KAFKA_BROKER=kafka2:9093
+      - CASSANDRA_HOSTS=cassandra1
+      - CLICKHOUSE_HOST=clickhouse
+    restart: on-failure
+
+  log-processor3:
+    build:
+      context: ./log-processor
+      dockerfile: Dockerfile
+    networks:
+      - lognet
+    volumes:
+      - gomodcache-log-processor:/go/pkg/mod
+    depends_on:
+      - kafka3
+      - cassandra1
+      - cassandra2
+      - cassandra3
+      - clickhouse
+    environment:
+      - KAFKA_BROKER=kafka3:9094
+      - CASSANDRA_HOSTS=cassandra1
+      - CLICKHOUSE_HOST=clickhouse
+    restart: on-failure

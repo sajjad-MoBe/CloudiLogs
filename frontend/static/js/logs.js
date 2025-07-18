@@ -9,6 +9,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  let currentEventName = null;
+
   const urlParams = new URLSearchParams(window.location.search);
   const projectId = urlParams.get("projectId");
   const projectName = urlParams.get("projectName");
@@ -35,6 +37,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   let individualLogs = [];
   let currentLogIndex = -1;
   let currentSearchParams = null;
+
+  let max_visited_log_index = 0;
 
   // 4. Core Functions
 
@@ -87,6 +91,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const params = { event_name: eventName, ...currentSearchParams };
       individualLogs = await api.getLogs(projectId, params);
+      currentEventName = eventName;
+
+      console.log(currentEventName)
 
       if (individualLogs.length > 0) {
         currentLogIndex = 0;
@@ -112,6 +119,9 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   function showLogDetails(index) {
     currentLogIndex = index;
+    if(currentLogIndex > max_visited_log_index){
+      max_visited_log_index = currentLogIndex;
+    }
     const log = individualLogs[currentLogIndex];
 
     const {
@@ -169,7 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const updateNavButtons = () => {
     prevLogBtn.disabled = currentLogIndex <= 0;
-    nextLogBtn.disabled = currentLogIndex >= individualLogs.length - 1;
+    nextLogBtn.disabled = currentLogIndex >= individualLogs.length - 1 && individualLogs.length % 100 !== 0;
     // Update the index indicator
     if (individualLogs.length > 0 && currentLogIndex >= 0) {
       logIndexIndicator.textContent = `${currentLogIndex + 1} of ${
@@ -178,7 +188,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
       logIndexIndicator.textContent = "";
     }
+    sendLogRequest(currentLogIndex);
+
+    // if(currentLogIndex % 100 == 0){
+    //     // we want to send network a request with url of sth like http://localhost:8084/api/projects/308eacef-a15d-43a6-9727-c8396124bfe0/logs?event_name=login_success&offset=100
+    //     // at first we will use http://localhost:8084/api/projects/308eacef-a15d-43a6-9727-c8396124bfe0/logs?event_name=login_success
+    // }
   };
+
+  function sendLogRequest(currentLogIndex) {
+  const BASE_URL = "http://localhost:8084/api/projects";
+  if (!currentEventName) return;
+
+    if (currentLogIndex % 96 === 0 && max_visited_log_index === currentLogIndex && currentLogIndex>0) {
+
+        const offset = (Math.floor(currentLogIndex / 100) + 1) * 100;
+
+        const url = `${BASE_URL}/${projectId}/logs?event_name=${currentEventName}&offset=${offset}`;
+        console.log(`Sending request to: ${url}`);
+
+        fetch(url)
+            .then((res) => {
+            if (!res.ok) throw new Error("Network response was not ok");
+            return res.json();
+            })
+            .then((data) => {
+            if (!Array.isArray(data) || data.length === 0) {
+                console.warn("No additional logs received.");
+                return;
+            }
+
+            individualLogs = individualLogs.concat(data);
+            currentLogIndex += 1;
+            showLogDetails(currentLogIndex);
+            })
+            .catch((error) => {
+            console.error("Fetch error:", error);
+            });
+        }
+}
 
   // Helper Functions for Rendering
   const escapeHTML = (str) => {
@@ -247,7 +295,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const handleNextLog = () => {
-    if (currentLogIndex < individualLogs.length - 1) {
+    if (currentLogIndex < individualLogs.length - 1 || individualLogs.length %100 == 0) {
       showLogDetails(currentLogIndex + 1);
     }
   };

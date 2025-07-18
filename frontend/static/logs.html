@@ -1,267 +1,362 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Logs - Log Management System</title>
-    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
     <style>
-        /* Shared "cool dark theme" with yellow accents */
-        :root {
-            --bg: #1a1a1a;
-            --accent-bg: #242424;
-            --text: #e2e2e2;
-            --accent: #ffc107; /* simple.css default yellow */
-            --border: #333;
-            --form-bg: #2d2d2d;
-            --hover-bg: #2c2c2c; /* Background for table row hover */
-        }
+      /* --- Base Theme & Variables --- */
+      :root {
+        --bg: #1a1a1a;
+        --accent-bg: #242424;
+        --text: #e2e2e2;
+        --accent: #ffc107; /* simple.css default yellow */
+        --border: #333;
+        --form-bg: #2d2d2d;
+        --hover-bg: #2c2c2c; /* Background for table row hover */
+      }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
 
-        /* --- UPDATED: Full-Width Header Styling --- */
-        header {
-            background-color: var(--accent-bg); /* Give the header a background */
-            border-bottom: 1px solid var(--border); /* Clean separator line */
-            padding: 1.5rem 1rem; /* Add horizontal padding for small screens */
-            margin-bottom: 2.5rem; /* Space between header and form */
-            text-align: center;
-        }
-        /* New container to keep content centered with the page */
-        .header-container {
-             max-width: 1200px;
-             margin: 0 auto;
-        }
-        header p {
-            margin-top: 0.5rem;
-        }
-        main {
-            max-width: 1200px;
-        }
-        header a {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 500;
-        }
-        header a:hover {
-            text-decoration: underline;
-        }
+      /* --- Full-Width Header Styling --- */
+      header {
+        background-color: var(--accent-bg);
+        border-bottom: 1px solid var(--border);
+        padding: 1.5rem 1rem;
+        margin-bottom: 2.5rem;
+        text-align: center;
+      }
+      .header-container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      header p {
+        margin-top: 0.5rem;
+      }
+      main {
+        max-width: 1200px;
+      }
+      header a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      header a:hover {
+        text-decoration: underline;
+      }
 
-        /* --- Search Form Styling --- */
-        form {
-            background-color: var(--accent-bg);
-            padding: 2rem;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            margin-bottom: 2rem;
-        }
-        form h2 {
-            text-align: center;
-        }
-        form p {
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-            margin-bottom: 1rem;
-        }
-        form p:last-child {
-            text-align: center;
-        }
+      /* --- Search Form Styling --- */
+      form {
+        background-color: var(--accent-bg);
+        padding: 2rem;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        margin-bottom: 2rem;
+      }
+      form h2 {
+        text-align: center;
+      }
+      form p {
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+        margin-bottom: 1rem;
+      }
+      form p:last-child {
+        text-align: center;
+      }
 
-        /* Input Styling */
-        input[type="text"],
-        input[type="datetime-local"] {
-            background-color: var(--form-bg);
-            border-color: var(--border);
-            border-radius: 4px;
-            color: var(--text);
-            width: 100%;
-        }
-        input[type="text"]:focus,
-        input[type="datetime-local"]:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.25);
-        }
+      /* --- Input Styling --- */
+      input[type="text"],
+      input[type="datetime-local"] {
+        background-color: var(--form-bg);
+        border-color: var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        width: 100%;
+      }
+      input[type="text"]:focus,
+      input[type="datetime-local"]:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.25);
+      }
 
-        /* Button Styling */
-        button[type="submit"] {
-            background-color: var(--accent);
-            border: none;
-            font-weight: 600;
-            color: #1a1a1a;
-            padding-left: 2rem;
-            padding-right: 2rem;
-        }
-        button[type="submit"]:hover {
-            background-color: #e0a800;
-        }
+      /* --- Button Styling --- */
+      button[type="submit"] {
+        background-color: var(--accent);
+        border: none;
+        font-weight: 600;
+        color: #1a1a1a;
+        padding-left: 2rem;
+        padding-right: 2rem;
+      }
+      button[type="submit"]:hover {
+        background-color: #e0a800;
+      }
 
-        /* --- Dark Theme Table Styling --- */
-        .log-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-            background-color: var(--accent-bg);
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-        }
-        .log-table th, .log-table td {
-            border: none;
-            border-bottom: 1px solid var(--border);
-            padding: 1rem;
-            text-align: left;
-        }
-        .log-table tbody tr:last-child td {
-             border-bottom: none;
-        }
-        .log-table th {
-            background-color: #333;
-            color: var(--text);
-            font-weight: 600;
-        }
-        .log-table tbody tr {
-            transition: background-color 0.2s ease;
-        }
-        .log-table tbody tr:hover {
-            background-color: var(--hover-bg);
-        }
-        .log-table button {
-            font-size: 0.9rem;
-        }
+      /* --- Dark Theme Table Styling --- */
+      .log-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+        background-color: var(--accent-bg);
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+      .log-table th,
+      .log-table td {
+        border: none;
+        border-bottom: 1px solid var(--border);
+        padding: 1rem;
+        text-align: left;
+      }
+      .log-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .log-table th {
+        background-color: #333;
+        color: var(--text);
+        font-weight: 600;
+      }
+      .log-table tbody tr {
+        transition: background-color 0.2s ease;
+      }
+      .log-table tbody tr:hover {
+        background-color: var(--hover-bg);
+      }
+      .log-table button {
+        font-size: 0.9rem;
+      }
 
-        /* --- Dark Theme Modal Styling --- */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 100;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.7);
-        }
-        .modal-content {
-            background-color: var(--accent-bg);
-            color: var(--text);
-            margin: 10% auto;
-            padding: 25px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            width: 80%;
-            max-width: 900px;
-            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
-        }
-        .close-btn {
-            color: #ccc;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            transition: color 0.2s ease;
-        }
-        .close-btn:hover,
-        .close-btn:focus {
-            color: white;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        .modal-content pre {
-            background-color: var(--bg);
-            padding: 15px;
-            border-radius: 5px;
-            border: 1px solid var(--border);
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            color: var(--text);
-        }
-        .modal-content div {
-            margin-top: 20px;
-        }
+      /* --- Dark Theme Modal Styling --- */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 100;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.7);
+      }
+      .modal-content {
+        background-color: var(--accent-bg);
+        color: var(--text);
+        margin: 10% auto;
+        padding: 25px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        width: 60%;
+        max-width: 800px;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+      }
+      .close-btn {
+        color: #ccc;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        transition: color 0.2s ease;
+      }
+      .close-btn:hover,
+      .close-btn:focus {
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .log-details-nav {
+        margin-top: 20px;
+      }
+
+      /* --- Enhanced Log Details Modal Content --- */
+      .log-details-structured {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        font-size: 1rem;
+        background: none;
+        border: none;
+        padding: 0;
+      }
+
+      .log-details-main {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        align-items: flex-start;
+      }
+
+      .log-details-card {
+        background: var(--bg);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        padding: 1.5rem;
+        min-width: 260px;
+        flex: 1 1 320px;
+      }
+
+      .log-details-title {
+        font-size: 1.25rem;
+        color: var(--accent);
+        font-weight: 600;
+        margin: 0 0 0.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .log-details-timestamp {
+        color: #b0b0b0;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+        display: block;
+        font-family: monospace;
+      }
+
+      .log-details-grid {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.5rem 1rem;
+        font-size: 0.9rem;
+      }
+
+      .log-details-key {
+        color: #a0a0a0;
+        font-weight: 500;
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .log-details-value {
+        color: var(--text);
+        word-break: break-all;
+        background: #2d2d2d;
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-family: monospace;
+      }
+
+      .log-details-section {
+        background: var(--bg);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        padding: 1rem 1.25rem;
+      }
+      .log-details-section h4 {
+        color: var(--text);
+        margin: 0 0 0.75rem 0;
+        font-size: 1rem;
+        font-weight: 600;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.5rem;
+      }
+      .log-details-section .log-details-grid {
+        padding: 0.25rem;
+      }
+
+      /* --- New Styles for Payload Section --- */
+      .payload-scroll-section .payload-scroll {
+        max-height: 220px;
+        overflow-y: auto;
+        background: #232323;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        padding: 0.5em 1em;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <header>
-        <div class="header-container">
-            <h1>Logs for <span id="project-name">Your Project</span></h1>
-            <p><a href="#">&larr; Back to Projects</a></p>
-        </div>
+      <div class="header-container">
+        <h1>Logs for <span id="project-name">Your Project</span></h1>
+        <p><a href="/projects.html">&larr; Back to Projects</a></p>
+      </div>
     </header>
     <main>
-        <form id="search-form">
-            <h2>Search Logs</h2>
-            <p>
-                <label for="event-name">Event Name</label>
-                <input type="text" id="event-name" name="event_name">
-            </p>
-            <p>
-                <label for="start-time">Start Time</label>
-                <input type="datetime-local" id="start-time" name="start_time" value="2025-07-17T21:09">
-            </p>
-            <p>
-                <label for="end-time">End Time</label>
-                <input type="datetime-local" id="end-time" name="end_time" value="2025-07-17T21:09">
-            </p>
-            <p>
-                <label for="search-keys">Searchable Keys (key:value, ...)</label>
-                <input type="text" id="search-keys" name="search_keys">
-            </p>
-            <p>
-                <button type="submit">Search</button>
-            </p>
-        </form>
+      <form id="search-form">
+        <h2>Search Logs</h2>
+        <p>
+          <label for="event-name">Event Name</label>
+          <input type="text" id="event-name" name="event_name" />
+        </p>
+        <p>
+          <label for="start-time">Start Time</label>
+          <input
+            type="datetime-local"
+            id="start-time"
+            name="start_time"
+            value="2025-07-14T21:09"
+          />
+        </p>
+        <p>
+          <label for="end-time">End Time</label>
+          <input
+            type="datetime-local"
+            id="end-time"
+            name="end_time"
+            value="2025-07-20T21:09"
+          />
+        </p>
+        <p>
+          <label for="search-keys">Searchable Keys (key:value, ...)</label>
+          <input type="text" id="search-keys" name="search_keys" />
+        </p>
+        <p>
+          <button type="submit">Search</button>
+        </p>
+      </form>
 
-        <h2>Log Events</h2>
-        <table class="log-table">
-            <thead>
-                <tr>
-                    <th>Event Name</th>
-                    <th>Total Count</th>
-                    <th>Last Seen</th>
-                    <th>Details</th>
-                </tr>
-            </thead>
-            <tbody id="logs-tbody">
-                <tr>
-                    <td>User Login Success</td>
-                    <td>152</td>
-                    <td>2025-07-17 21:00:00</td>
-                    <td><button>View</button></td>
-                </tr>
-                <tr>
-                    <td>Payment Failed</td>
-                    <td>5</td>
-                    <td>2025-07-17 20:45:10</td>
-                    <td><button>View</button></td>
-                </tr>
-                 <tr>
-                    <td>API Request Timeout</td>
-                    <td>23</td>
-                    <td>2025-07-17 19:12:34</td>
-                    <td><button>View</button></td>
-                </tr>
-            </tbody>
-        </table>
-        <p id="no-logs" style="display: none;">No logs found for this project.</p>
+      <h2>Log Events</h2>
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>Event Name</th>
+            <th>Total Count</th>
+            <th>Last Seen</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="logs-tbody">
+          <tr>
+            <td>User Login Success</td>
+            <td>152</td>
+            <td>2025-07-17 21:00:00</td>
+            <td><button>View</button></td>
+          </tr>
+          <tr>
+            <td>Payment Failed</td>
+            <td>5</td>
+            <td>2025-07-17 20:45:10</td>
+            <td><button>View</button></td>
+          </tr>
+          <tr>
+            <td>API Request Timeout</td>
+            <td>23</td>
+            <td>2025-07-17 19:12:34</td>
+            <td><button>View</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <p id="no-logs" style="display: none">No logs found for this project.</p>
 
-        <div id="log-details-modal" class="modal">
-            <div class="modal-content">
-                <span class="close-btn">&times;</span>
-                <h3>Log Details</h3>
-                <pre id="log-details-content">{
-  "user_id": "usr_12345",
-  "ip_address": "192.168.1.1",
-  "message": "User login successful via password."
-}</pre>
-                <div>
-                    <button id="prev-log-btn">&larr; Previous</button>
-                    <button id="next-log-btn">Next &rarr;</button>
-                </div>
-            </div>
+      <div id="log-details-modal" class="modal">
+        <div class="modal-content">
+          <span class="close-btn">&times;</span>
+          <h3>Log Details</h3>
+          <div id="log-details-content" class="log-details-structured"></div>
+          <div class="log-details-nav">
+            <button id="prev-log-btn">Prev</button>
+            <span id="log-index-indicator" style="margin: 0 1em"></span>
+            <button id="next-log-btn">Next</button>
+          </div>
         </div>
+      </div>
     </main>
     <script type="module" src="/js/logs.js"></script>
-</body>
+  </body>
 </html>

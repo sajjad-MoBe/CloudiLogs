@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { getCurrentUser, redirectToLogin } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
+  // 1. Authentication and Initial Setup
   const user = await getCurrentUser();
   if (!user) {
     redirectToLogin();
@@ -17,7 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // DOM Elements
+  // 2. DOM Elements
   const projectNameSpan = document.getElementById("project-name");
   const searchForm = document.getElementById("search-form");
   const logsTbody = document.getElementById("logs-tbody");
@@ -28,22 +29,32 @@ document.addEventListener("DOMContentLoaded", async () => {
   const nextLogBtn = document.getElementById("next-log-btn");
   const closeBtn = document.querySelector(".close-btn");
 
-  // State
+  // 3. State Management
   let logs = [];
   let individualLogs = [];
   let currentLogIndex = -1;
   let currentSearchParams = null;
 
-  // --- Main Application Functions ---
+  // 4. Core Functions
 
-  const showModal = () => {
-    logDetailsModal.style.display = "block";
+  /**
+   * Fetches aggregated logs from the API and renders them in the main table.
+   * @param {object} params - The search parameters for the API call.
+   */
+  const fetchAndRenderLogs = async (params) => {
+    try {
+      logs = await api.getAggregatedLogs(projectId, params);
+      renderLogs();
+    } catch (error) {
+      console.error("Error fetching logs:", error);
+      noLogsMessage.textContent = "Failed to load logs.";
+      noLogsMessage.style.display = "block";
+    }
   };
 
-  const hideModal = () => {
-    logDetailsModal.style.display = "none";
-  };
-
+  /**
+   * Renders the aggregated logs into the table body.
+   */
   const renderLogs = () => {
     logsTbody.innerHTML = "";
     if (logs.length === 0) {
@@ -58,29 +69,22 @@ document.addEventListener("DOMContentLoaded", async () => {
           <td>${log.event_name}</td>
           <td>${log.total_count}</td>
           <td>${new Date(log.last_seen).toLocaleString()}</td>
-          <td><button class="view-details-btn" data-event-name="${
-            log.event_name
-          }">View Logs</button></td>
+          <td><button class="view-details-btn" data-event-name="${log.event_name}">View Logs</button></td>
         `;
         logsTbody.appendChild(row);
       });
     }
   };
 
-  const fetchAndRenderLogs = async (params) => {
-    try {
-      logs = await api.getAggregatedLogs(projectId, params);
-      renderLogs();
-    } catch (error) {
-      console.error("Error fetching logs:", error);
-      noLogsMessage.textContent = "Failed to load logs.";
-      noLogsMessage.style.display = "block";
-    }
-  };
-
+  /**
+   * Fetches the full details for a specific event name.
+   * @param {string} eventName - The name of the event to fetch logs for.
+   */
   const fetchIndividualLogs = async (eventName) => {
     try {
-      individualLogs = await api.getLogs(projectId, { event_name: eventName });
+      const params = { event_name: eventName, ...currentSearchParams };
+      individualLogs = await api.getLogs(projectId, params);
+
       if (individualLogs.length > 0) {
         currentLogIndex = 0;
         showLogDetails(currentLogIndex);
@@ -94,43 +98,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  // --- Log Details Rendering ---
 
-  // Helper function to safely escape HTML
-  function escapeHTML(str) {
-    if (typeof str !== "string") return "";
-    return str.replace(
-      /[&<>"']/g,
-      (m) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        }[m])
-    );
-  }
+  // 5. Modal and Log Details Rendering
 
-  // Helper function to render a key-value object as a grid
-  function renderKeyValueGrid(obj) {
-    if (!obj || typeof obj !== "object" || Object.keys(obj).length === 0) {
-      return '<div style="color:#888; font-style:italic; padding: 0.5rem;">(No data)</div>';
-    }
-    return (
-      '<div class="log-details-grid">' +
-      Object.entries(obj)
-        .map(
-          ([k, v]) =>
-            `<div class="log-details-key">${escapeHTML(k)}:</div>
-             <div class="log-details-value">${escapeHTML(String(v))}</div>`
-        )
-        .join("") +
-      "</div>"
-    );
-  }
+  const showModal = () => logDetailsModal.style.display = "block";
+  const hideModal = () => logDetailsModal.style.display = "none";
 
-  // The main function to render the pretty modal content
+  /**
+   * Renders the detailed content for a single log inside the modal.
+   * @param {number} index - The index of the log to display from the individualLogs array.
+   */
   function showLogDetails(index) {
     currentLogIndex = index;
     const log = individualLogs[currentLogIndex];
@@ -145,15 +122,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       ...rest
     } = log;
 
-    // Primary info card (removed emoji before event name)
     const primaryHTML = `
       <div class="log-details-card">
-        <div class="log-details-title">
-          ${escapeHTML(event_name || "(no event name)")}
-        </div>
-        <span class="log-details-timestamp">
-          ${timestamp ? new Date(timestamp).toLocaleString() : ""}
-        </span>
+        <div class="log-details-title">${escapeHTML(event_name || "(no event name)")}</div>
+        <span class="log-details-timestamp">${timestamp ? new Date(timestamp).toLocaleString() : ""}</span>
         <div class="log-details-grid">
           <div class="log-details-key">Log ID</div>
           <div class="log-details-value">${escapeHTML(id || "")}</div>
@@ -174,9 +146,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     logDetailsContent.innerHTML = `
-      <div class="log-details-main">
-        ${primaryHTML}
-      </div>
+      <div class="log-details-main">${primaryHTML}</div>
       <div class="log-details-section">
         <h4>Searchable Keys</h4>
         ${renderKeyValueGrid(searchable_keys)}
@@ -196,11 +166,39 @@ document.addEventListener("DOMContentLoaded", async () => {
     nextLogBtn.disabled = currentLogIndex >= individualLogs.length - 1;
   };
 
-  // --- Event Handlers ---
+  // Helper Functions for Rendering
+  const escapeHTML = (str) => {
+    if (typeof str !== "string") return "";
+    return str.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  };
 
+  const renderKeyValueGrid = (obj) => {
+    if (!obj || typeof obj !== "object" || Object.keys(obj).length === 0) {
+      return '<div style="color:#888; font-style:italic; padding: 0.5rem;">(No data)</div>';
+    }
+    return (
+      '<div class="log-details-grid">' +
+      Object.entries(obj)
+        .map(([k, v]) => `<div class="log-details-key">${escapeHTML(k)}:</div><div class="log-details-value">${escapeHTML(String(v))}</div>`)
+        .join("") +
+      "</div>"
+    );
+  };
+
+
+  // 6. Event Handlers
   const handleSearch = async (e) => {
     e.preventDefault();
-    // ... search logic remains the same
+    const formData = new FormData(searchForm);
+    const params = {
+      event_name: formData.get("event_name"),
+      start_time: formData.get("start_time"),
+      end_time: formData.get("end_time"),
+      search_keys: formData.get("search_keys"),
+    };
+    // Filter out empty values
+    currentSearchParams = Object.fromEntries(Object.entries(params).filter(([_, v]) => v));
+    await fetchAndRenderLogs(currentSearchParams);
   };
 
   const handleViewDetails = (e) => {
@@ -222,8 +220,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  // --- Initial Setup ---
+  // 7. Initializer
   projectNameSpan.textContent = projectName;
+
   searchForm.addEventListener("submit", handleSearch);
   logsTbody.addEventListener("click", handleViewDetails);
   prevLogBtn.addEventListener("click", handlePrevLog);
@@ -235,6 +234,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // Initial Load
+  // Initial data load
   fetchAndRenderLogs({});
 });

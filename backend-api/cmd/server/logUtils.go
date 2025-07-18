@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -36,6 +35,13 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type LogIngestionPayload struct {
+	Name           string            `json:"name"`
+	Timestamp      time.Time         `json:"timestamp"`
+	SearchableKeys map[string]string `json:"searchable_keys"`
+	FullPayload    json.RawMessage   `json:"full_payload"`
+}
+
 type KafkaLogMessage struct {
 	ProjectID string          `json:"project_id"`
 	Payload   json.RawMessage `json:"payload"`
@@ -59,23 +65,31 @@ func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read the log payload
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		RespondWithError(w, http.StatusBadRequest, "Could not read request body")
+	// Read and validate the log payload
+	var logPayload LogIngestionPayload
+	if err := json.NewDecoder(r.Body).Decode(&logPayload); err != nil {
+		RespondWithError(w, http.StatusBadRequest, "Invalid request payload: "+err.Error())
 		return
 	}
 	defer r.Body.Close()
 
-	if len(body) == 0 {
-		RespondWithError(w, http.StatusBadRequest, "Request body is empty")
+	if logPayload.Name == "" || logPayload.Timestamp.IsZero() {
+		RespondWithError(w, http.StatusBadRequest, "Missing required fields: name and timestamp must be provided")
+		return
+	}
+
+	// Re-marshal the validated payload to be sent to Kafka
+	payloadBytes, err := json.Marshal(logPayload)
+	if err != nil {
+		log.Printf("Failed to re-marshal log payload: %v", err)
+		RespondWithError(w, http.StatusInternalServerError, "Failed to process log")
 		return
 	}
 
 	// Create the structured message for Kafka
 	kafkaMsg := KafkaLogMessage{
 		ProjectID: projectID,
-		Payload:   json.RawMessage(body),
+		Payload:   json.RawMessage(payloadBytes),
 	}
 
 	kafkaMsgBytes, err := json.Marshal(kafkaMsg)

@@ -55,7 +55,14 @@ for (( i=1; i<=TOTAL_LOGS; i++ )); do
     # manage concurrency, wait for all background jobs to finish every 100 requests.
     if (( i % 100 == 0 )); then
         wait
-        echo "Sent $i / $TOTAL_LOGS logs..."
+        sleep 5
+        USED_DISK=$(df / | awk 'NR==2 {gsub(/%/, "", $5); print $5}')
+        echo "Sent $i / $TOTAL_LOGS logs... Disk usage: ${USED_DISK}%"
+
+        if (( USED_DISK > 80 )); then
+            echo "Disk usage is above 80% (${USED_DISK}%). Aborting load test."
+            exit 1
+        fi
     fi
 done
 

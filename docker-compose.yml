@@ -138,8 +138,6 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_SERVER_ID: 1
-      ZOOKEEPER_SERVERS: server.1=zookeeper1:2888:3888;server.2=zookeeper2:2888:3888;server.3=zookeeper3:2888:3888
 
   zookeeper2:
     image: confluentinc/cp-zookeeper:7.3.2
@@ -151,8 +149,6 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_SERVER_ID: 2
-      ZOOKEEPER_SERVERS: server.1=zookeeper1:2888:3888;server.2=zookeeper2:2888:3888;server.3=zookeeper3:2888:3888
 
   zookeeper3:
     image: confluentinc/cp-zookeeper:7.3.2
@@ -164,8 +160,6 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_SERVER_ID: 3
-      ZOOKEEPER_SERVERS: server.1=zookeeper1:2888:3888;server.2=zookeeper2:2888:3888;server.3=zookeeper3:2888:3888
 
   kafka1:
     image: confluentinc/cp-kafka:7.3.2
@@ -176,15 +170,13 @@ services:
       - "9092:9092"
     depends_on:
       - zookeeper1
-      - zookeeper2
-      - zookeeper3
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper1:2181,zookeeper2:2181,zookeeper3:2181'
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper1:2181'
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
 
@@ -196,16 +188,14 @@ services:
     ports:
       - "9093:9093"
     depends_on:
-      - zookeeper1
       - zookeeper2
-      - zookeeper3
     environment:
       KAFKA_BROKER_ID: 2
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper1:2181,zookeeper2:2181,zookeeper3:2181'
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper2:2181'
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9093,PLAINTEXT_HOST://localhost:29093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
 
@@ -217,16 +207,14 @@ services:
     ports:
       - "9094:9094"
     depends_on:
-      - zookeeper1
-      - zookeeper2
       - zookeeper3
     environment:
       KAFKA_BROKER_ID: 3
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper1:2181,zookeeper2:2181,zookeeper3:2181'
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper3:2181'
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9094,PLAINTEXT_HOST://localhost:29094
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG4J_LOGGERS: "kafka.coordinator.group.GroupCoordinator=WARN,kafka.controller=WARN,kafka.producer.async.DefaultEventHandler=WARN,kafka.server.ReplicaFetcherManager=WARN,kafka.server.KafkaApis=WARN"
 
@@ -307,7 +295,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
 
-  log-processor:
+  log-processor1:
     build:
       context: ./log-processor
       dockerfile: Dockerfile
@@ -317,28 +305,52 @@ services:
       - gomodcache-log-processor:/go/pkg/mod
     depends_on:
       - kafka1
+      - cassandra1
+      - cassandra2
+      - cassandra3
+      - clickhouse
+    environment:
+      - KAFKA_BROKER=kafka1:9092
+      - CASSANDRA_HOSTS=cassandra1
+      - CLICKHOUSE_HOST=clickhouse
+    restart: on-failure
+
+  log-processor2:
+    build:
+      context: ./log-processor
+      dockerfile: Dockerfile
+    networks:
+      - lognet
+    volumes:
+      - gomodcache-log-processor:/go/pkg/mod
+    depends_on:
       - kafka2
+      - cassandra1
+      - cassandra2
+      - cassandra3
+      - clickhouse
+    environment:
+      - KAFKA_BROKER=kafka2:9093
+      - CASSANDRA_HOSTS=cassandra1
+      - CLICKHOUSE_HOST=clickhouse
+    restart: on-failure
+
+  log-processor3:
+    build:
+      context: ./log-processor
+      dockerfile: Dockerfile
+    networks:
+      - lognet
+    volumes:
+      - gomodcache-log-processor:/go/pkg/mod
+    depends_on:
       - kafka3
       - cassandra1
       - cassandra2
       - cassandra3
       - clickhouse
     environment:
-      - KAFKA_BROKER=kafka1:9092,kafka2:9093,kafka3:9094
+      - KAFKA_BROKER=kafka3:9094
       - CASSANDRA_HOSTS=cassandra1
       - CLICKHOUSE_HOST=clickhouse
     restart: on-failure
-
-  kafka-init:
-    build:
-      context: ./kafka-init
-      dockerfile: Dockerfile
-    networks:
-      - lognet
-    depends_on:
-      kafka1:
-        condition: service_started
-      kafka2:
-        condition: service_started
-      kafka3:
-        condition: service_started

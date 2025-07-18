@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -105,6 +106,10 @@ func logIngestionHandler(w http.ResponseWriter, r *http.Request) {
 		Key:   []byte(projectID),
 		Value: kafkaMsgBytes,
 	}
+
+	// Round-robin selection of Kafka writer
+	writerIndex := atomic.AddInt64(&logCounter, 1) % int64(len(kafkaWriters))
+	kafkaWriter := kafkaWriters[writerIndex]
 
 	// Write the message to Kafka
 	err = kafkaWriter.WriteMessages(r.Context(), msg)

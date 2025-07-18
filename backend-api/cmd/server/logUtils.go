@@ -147,8 +147,39 @@ func getAggregatedLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build the aggregation query
-	sql := "SELECT event_name, count(), max(event_timestamp) FROM logs WHERE project_id = ? GROUP BY event_name"
+	eventName := r.URL.Query().Get("event_name")
+	startTime := r.URL.Query().Get("start_time")
+	endTime := r.URL.Query().Get("end_time")
+	searchKeysStr := r.URL.Query().Get("search_keys")
+
+	sql := "SELECT event_name, count(), max(event_timestamp) FROM logs WHERE project_id = ?"
 	args := []interface{}{projectID}
+
+	if eventName != "" {
+		sql += " AND event_name = ?"
+		args = append(args, eventName)
+	}
+	if startTime != "" {
+		sql += " AND event_timestamp >= ?"
+		args = append(args, startTime)
+	}
+	if endTime != "" {
+		sql += " AND event_timestamp <= ?"
+		args = append(args, endTime)
+	}
+	if searchKeysStr != "" {
+		searchKeys, err := parseSearchKeys(searchKeysStr)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid search_keys format")
+			return
+		}
+		for k, v := range searchKeys {
+			sql += " AND searchable_keys[?] = ?"
+			args = append(args, k, v)
+		}
+	}
+
+	sql += " GROUP BY event_name"
 
 	// Execute the query
 	rows, err := chConn.Query(r.Context(), sql, args...)

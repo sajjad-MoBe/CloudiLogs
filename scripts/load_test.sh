@@ -55,7 +55,7 @@ for (( i=1; i<=TOTAL_LOGS; i++ )); do
     # manage concurrency, wait for all background jobs to finish every 100 requests.
     if (( i % 100 == 0 )); then
         wait
-        sleep 5
+        sleep 1
         USED_DISK=$(df / | awk 'NR==2 {gsub(/%/, "", $5); print $5}')
         echo "Sent $i / $TOTAL_LOGS logs... Disk usage: ${USED_DISK}%"
 

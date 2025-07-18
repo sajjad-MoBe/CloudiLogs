@@ -48,7 +48,7 @@ EOF
 )
 
 # Send the request using curl
-curl -i -X POST "http://91.107.138.2:8083/api/projects/${PROJECT_ID}/logs" \
+curl -i -X POST "http://91.107.241.110:8083/api/projects/${PROJECT_ID}/logs" \
 -H "Content-Type: application/json" \
 -H "X-API-KEY: ${API_KEY}" \
 -d "$JSON_PAYLOAD"

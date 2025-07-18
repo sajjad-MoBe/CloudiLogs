@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 row.innerHTML = `
                     <td><a href="/logs.html?projectId=${project.id}&projectName=${project.name}">${project.name}</a></td>
                     <td>${project.description || ''}</td>
+                    <td>${project.id}</td>
                     <td data-project-id="${project.id}">
                         <button class="get-api-key-btn">Show API Key</button>
                     </td>

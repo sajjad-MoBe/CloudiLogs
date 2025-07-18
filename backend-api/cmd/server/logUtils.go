@@ -160,12 +160,22 @@ func getAggregatedLogsHandler(w http.ResponseWriter, r *http.Request) {
 		args = append(args, eventName)
 	}
 	if startTime != "" {
+		formattedStartTime, err := parseAndFormatTime(startTime)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid start_time format")
+			return
+		}
 		sql += " AND event_timestamp >= ?"
-		args = append(args, startTime)
+		args = append(args, formattedStartTime)
 	}
 	if endTime != "" {
+		formattedEndTime, err := parseAndFormatTime(endTime)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid end_time format")
+			return
+		}
 		sql += " AND event_timestamp <= ?"
-		args = append(args, endTime)
+		args = append(args, formattedEndTime)
 	}
 	if searchKeysStr != "" {
 		searchKeys, err := parseSearchKeys(searchKeysStr)
@@ -189,7 +199,7 @@ func getAggregatedLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var aggregatedLogs []AggregatedLog
+	aggregatedLogs := make([]AggregatedLog, 0)
 	for rows.Next() {
 		var aggLog AggregatedLog
 		var totalCount uint64
@@ -243,12 +253,22 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 		args = append(args, eventName)
 	}
 	if startTime != "" {
+		formattedStartTime, err := parseAndFormatTime(startTime)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid start_time format")
+			return
+		}
 		sql += " AND event_timestamp >= ?"
-		args = append(args, startTime)
+		args = append(args, formattedStartTime)
 	}
 	if endTime != "" {
+		formattedEndTime, err := parseAndFormatTime(endTime)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid end_time format")
+			return
+		}
 		sql += " AND event_timestamp <= ?"
-		args = append(args, endTime)
+		args = append(args, formattedEndTime)
 	}
 
 	if searchKeysStr != "" {
@@ -283,7 +303,7 @@ func queryLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var logs []Log
+	logs := make([]Log, 0)
 	for rows.Next() {
 		var logItem Log
 		if err := rows.Scan(&logItem.ID, &logItem.EventName, &logItem.Timestamp, &logItem.SearchableKeys); err != nil {
@@ -358,4 +378,15 @@ func getLogHandler(w http.ResponseWriter, r *http.Request) {
 	log.ID = logID
 
 	RespondWithJSON(w, http.StatusOK, log)
+}
+
+func parseAndFormatTime(timeStr string) (string, error) {
+	if timeStr == "" {
+		return "", nil
+	}
+	t, err := time.Parse("2006-01-02T15:04", timeStr)
+	if err != nil {
+		return "", err
+	}
+	return t.Format("2006-01-02 15:04:05"), nil
 }

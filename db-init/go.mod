@@ -1,4 +1,4 @@
-module log-system/db-init
+module github.com/sajjad-MoBe/CloudiLogs/db-init
 
 go 1.23
 

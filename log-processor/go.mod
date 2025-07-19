@@ -1,4 +1,4 @@
-module log-system/log-processor
+module github.com/sajjad-MoBe/CloudiLogs/log-processor
 
 go 1.23
 

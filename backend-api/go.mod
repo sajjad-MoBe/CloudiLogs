@@ -1,4 +1,4 @@
-module log-system/backend-api
+module github.com/sajjad-MoBe/CloudiLogs/backend-api
 
 go 1.23.0
 

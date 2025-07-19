@@ -82,7 +82,15 @@ You can use the provided scripts to send test logs to your project.
     ./scripts/load_test.sh <YOUR_PROJECT_ID> <YOUR_API_KEY>
     ```
 
+
+*   **Run a write benchmark test:**
+    ##### edit scripts/bench_write.py (lines 10:13)
+    ```
+    python3 scripts/bench_write.py 
+    ```
+
 *   **Run a read benchmark test:**
-    ```bash
-    ./scripts/benchmark_reads.sh <USERNAME> <PASSWORD> <PROJECT_ID> <EVENT_NAME>
+    ##### edit scripts/bench_read.py (lines 6:10)
+    ```
+    python3 scripts/bench_read.py 
     ```
